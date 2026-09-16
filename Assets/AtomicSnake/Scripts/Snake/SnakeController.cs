@@ -5,172 +5,139 @@ using UnityEngine;
 
 namespace AtomicSnake.Snake
 {
-    // Continuous, slither-style movement: the head steers smoothly toward a
-    // cardinal target heading (set by arrow-key/WASD input) and every body
-    // segment follows the head's recently-traveled path, so turns curve
-    // naturally instead of snapping between grid cells.
+    // Classic grid-stepping snake: moves one cell per tick, wraps at the
+    // field edges, and reports self-collision so the caller can react.
     public class SnakeController : MonoBehaviour
     {
-        public event Action<Vector3> OnHeadMoved;
+        public event Action<Vector2Int> OnHeadMoved;
         public event Action OnSelfCollision;
-        public event Action OnHitWall;
 
-        const float TrailSampleSpacing = 0.03f;
-        const int SkipNearestSegmentsForCollision = 4;
+        [SerializeField] float moveInterval = 0.18f;
 
         static readonly Color HeadColor = new Color(0.16f, 0.38f, 0.86f);
         static readonly Color BodyColor = new Color(0.30f, 0.68f, 0.36f);
 
-        Transform _container;
-        Transform _headVisual;
-        readonly List<Transform> _segmentVisuals = new();
-        readonly List<Vector3> _segmentPositions = new();
-        readonly List<Vector3> _trail = new();
+        readonly List<Vector2Int> _cells = new();
+        readonly List<SpriteRenderer> _segments = new();
 
-        Vector3 _headPosition;
-        float _heading;
-        float _targetHeading;
-        int _segmentCount;
+        Vector2Int _direction;
+        Vector2Int _pendingDirection;
         int _pendingGrowth;
+        float _tickTimer;
+        Transform _container;
         bool _active;
 
-        public Vector3 HeadPosition => _headPosition;
-        public IReadOnlyList<Vector3> SegmentPositions => _segmentPositions;
+        public IReadOnlyList<Vector2Int> Cells => _cells;
+        public Vector2Int HeadCell => _cells[0];
+        public int Length => _cells.Count;
 
         public void Initialize(Transform container)
         {
             _container = container;
         }
 
-        public void ResetSnake(Vector3 startPosition, int startLength, float startHeadingDegrees)
+        public void ResetSnake(Vector2Int startCell, int startLength, Vector2Int startDirection)
         {
-            if (_headVisual != null) Destroy(_headVisual.gameObject);
-            foreach (var seg in _segmentVisuals)
-                if (seg != null) Destroy(seg.gameObject);
-            _segmentVisuals.Clear();
-            _segmentPositions.Clear();
-            _trail.Clear();
+            foreach (var segment in _segments)
+                Destroy(segment.gameObject);
+            _segments.Clear();
+            _cells.Clear();
 
-            _headPosition = startPosition;
-            _heading = startHeadingDegrees;
-            _targetHeading = startHeadingDegrees;
-            _segmentCount = startLength;
+            _direction = startDirection;
+            _pendingDirection = startDirection;
             _pendingGrowth = 0;
+            _tickTimer = 0f;
 
-            var backward = HeadingToDirection(startHeadingDegrees + 180f);
-            float totalBack = (startLength + 2) * FieldConfig.SegmentSpacing;
-            for (float d = totalBack; d >= 0f; d -= TrailSampleSpacing)
-                _trail.Add(startPosition + backward * d);
-
-            _headVisual = ShapeFactory.CreateSphere(_container, HeadColor, FieldConfig.HeadRadius * 2f, "Head").transform;
             for (int i = 0; i < startLength; i++)
-                _segmentVisuals.Add(ShapeFactory.CreateSphere(_container, BodyColor, FieldConfig.SegmentRadius * 2f).transform);
+                _cells.Add(GridUtil.Wrap(startCell - startDirection * i));
+
+            for (int i = 0; i < startLength; i++)
+                _segments.Add(CreateSegmentVisual());
 
             RefreshVisuals();
             _active = true;
         }
 
         public void SetActive(bool value) => _active = value;
+
         public void QueueGrowth(int amount = 1) => _pendingGrowth += amount;
-        public void SetTargetHeading(float degrees) => _targetHeading = degrees;
+
+        public void TrySetDirection(Vector2Int dir)
+        {
+            if (dir == Vector2Int.zero || dir == -_direction) return;
+            _pendingDirection = dir;
+        }
+
+        public bool OccupiesCell(Vector2Int cell) => _cells.Contains(cell);
+
+        SpriteRenderer CreateSegmentVisual()
+        {
+            var go = new GameObject("SnakeSegment");
+            go.transform.SetParent(_container, false);
+            var sr = go.AddComponent<SpriteRenderer>();
+            sr.sprite = SpriteFactory.GetCircle(BodyColor);
+            sr.sortingOrder = 10;
+            return sr;
+        }
 
         void Update()
         {
             if (!_active) return;
 
-            _heading = Mathf.MoveTowardsAngle(_heading, _targetHeading, FieldConfig.TurnRateDegreesPerSec * Time.deltaTime);
-            var direction = HeadingToDirection(_heading);
-            _headPosition += direction * FieldConfig.SnakeSpeed * Time.deltaTime;
+            _tickTimer += Time.deltaTime;
+            if (_tickTimer >= moveInterval)
+            {
+                _tickTimer -= moveInterval;
+                Step();
+            }
+        }
 
-            AppendTrail(_headPosition);
+        void Step()
+        {
+            _direction = _pendingDirection;
+            var newHead = GridUtil.Wrap(_cells[0] + _direction);
+            bool willGrow = _pendingGrowth > 0;
 
-            if (_pendingGrowth > 0)
+            bool collided = false;
+            int bodyLimit = willGrow ? _cells.Count : _cells.Count - 1;
+            for (int i = 0; i < bodyLimit; i++)
+            {
+                if (_cells[i] != newHead) continue;
+                collided = true;
+                break;
+            }
+
+            _cells.Insert(0, newHead);
+            if (willGrow)
             {
                 _pendingGrowth--;
-                _segmentCount++;
-                _segmentVisuals.Add(ShapeFactory.CreateSphere(_container, BodyColor, FieldConfig.SegmentRadius * 2f).transform);
+                _segments.Insert(0, CreateSegmentVisual());
+            }
+            else
+            {
+                _cells.RemoveAt(_cells.Count - 1);
+                var tailSegment = _segments[^1];
+                _segments.RemoveAt(_segments.Count - 1);
+                _segments.Insert(0, tailSegment);
             }
 
             RefreshVisuals();
-            _headVisual.rotation = Quaternion.LookRotation(direction, Vector3.up);
-
-            OnHeadMoved?.Invoke(_headPosition);
-
-            if (FieldConfig.IsOutOfBounds(_headPosition))
-                OnHitWall?.Invoke();
-            else if (CheckSelfCollision())
+            OnHeadMoved?.Invoke(newHead);
+            if (collided)
                 OnSelfCollision?.Invoke();
-        }
-
-        void AppendTrail(Vector3 newPos)
-        {
-            if (_trail.Count == 0 || Vector3.Distance(_trail[^1], newPos) >= TrailSampleSpacing)
-                _trail.Add(newPos);
-
-            float maxNeeded = (_segmentCount + 2) * FieldConfig.SegmentSpacing + 0.5f;
-            float total = 0f;
-            int cut = 0;
-            for (int i = _trail.Count - 1; i > 0; i--)
-            {
-                total += Vector3.Distance(_trail[i], _trail[i - 1]);
-                if (total > maxNeeded)
-                {
-                    cut = i - 1;
-                    break;
-                }
-            }
-            if (cut > 0) _trail.RemoveRange(0, cut);
-        }
-
-        Vector3 PositionAtDistanceBehindHead(float distance)
-        {
-            if (_trail.Count == 0) return _headPosition;
-
-            float remaining = distance;
-            Vector3 prevPoint = _headPosition;
-            for (int i = _trail.Count - 1; i >= 0; i--)
-            {
-                Vector3 point = _trail[i];
-                float segLen = Vector3.Distance(prevPoint, point);
-                if (segLen >= remaining)
-                {
-                    float t = segLen > 0f ? remaining / segLen : 0f;
-                    return Vector3.Lerp(prevPoint, point, t);
-                }
-                remaining -= segLen;
-                prevPoint = point;
-            }
-            return _trail[0];
         }
 
         void RefreshVisuals()
         {
-            _headVisual.localPosition = _headPosition + Vector3.up * FieldConfig.HeadRadius;
-
-            _segmentPositions.Clear();
-            for (int i = 0; i < _segmentVisuals.Count; i++)
+            for (int i = 0; i < _segments.Count; i++)
             {
-                float distance = (i + 1) * FieldConfig.SegmentSpacing;
-                var pos = PositionAtDistanceBehindHead(distance);
-                _segmentPositions.Add(pos);
-                _segmentVisuals[i].localPosition = pos + Vector3.up * FieldConfig.SegmentRadius;
+                var sr = _segments[i];
+                sr.transform.localPosition = GridUtil.CellToWorld(_cells[i]);
+                bool isHead = i == 0;
+                sr.sprite = SpriteFactory.GetCircle(isHead ? HeadColor : BodyColor);
+                sr.sortingOrder = isHead ? 12 : 10;
+                SpriteFactory.SetWorldSize(sr, GridConfig.CellSize * (isHead ? 0.92f : 0.8f));
             }
-        }
-
-        bool CheckSelfCollision()
-        {
-            for (int i = SkipNearestSegmentsForCollision; i < _segmentPositions.Count; i++)
-            {
-                if (Vector3.Distance(_headPosition, _segmentPositions[i]) < FieldConfig.SelfCollisionDistance)
-                    return true;
-            }
-            return false;
-        }
-
-        static Vector3 HeadingToDirection(float degrees)
-        {
-            float rad = degrees * Mathf.Deg2Rad;
-            return new Vector3(Mathf.Cos(rad), 0f, Mathf.Sin(rad));
         }
     }
 }

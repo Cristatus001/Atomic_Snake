@@ -2,8 +2,7 @@ using UnityEngine;
 
 namespace AtomicSnake.Snake
 {
-    // Arrow keys / WASD pick a cardinal target heading; SnakeController turns
-    // smoothly toward it instead of snapping, so corners curve naturally.
+    // Arrow keys / WASD steering for the snake.
     [RequireComponent(typeof(SnakeController))]
     public class PlayerInputReader : MonoBehaviour
     {
@@ -16,14 +15,14 @@ namespace AtomicSnake.Snake
 
         void Update()
         {
-            if (Input.GetKeyDown(KeyCode.RightArrow) || Input.GetKeyDown(KeyCode.D))
-                _snake.SetTargetHeading(0f);
-            else if (Input.GetKeyDown(KeyCode.UpArrow) || Input.GetKeyDown(KeyCode.W))
-                _snake.SetTargetHeading(90f);
-            else if (Input.GetKeyDown(KeyCode.LeftArrow) || Input.GetKeyDown(KeyCode.A))
-                _snake.SetTargetHeading(180f);
+            if (Input.GetKeyDown(KeyCode.UpArrow) || Input.GetKeyDown(KeyCode.W))
+                _snake.TrySetDirection(Vector2Int.up);
             else if (Input.GetKeyDown(KeyCode.DownArrow) || Input.GetKeyDown(KeyCode.S))
-                _snake.SetTargetHeading(270f);
+                _snake.TrySetDirection(Vector2Int.down);
+            else if (Input.GetKeyDown(KeyCode.LeftArrow) || Input.GetKeyDown(KeyCode.A))
+                _snake.TrySetDirection(Vector2Int.left);
+            else if (Input.GetKeyDown(KeyCode.RightArrow) || Input.GetKeyDown(KeyCode.D))
+                _snake.TrySetDirection(Vector2Int.right);
         }
     }
 }

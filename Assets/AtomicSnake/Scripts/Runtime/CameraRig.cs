@@ -14,18 +14,14 @@ namespace AtomicSnake.Runtime
                 go.AddComponent<AudioListener>();
             }
 
-            cam.orthographic = false;
-            cam.fieldOfView = 48f;
-            cam.nearClipPlane = 0.1f;
-            cam.farClipPlane = 100f;
-            cam.clearFlags = CameraClearFlags.SolidColor;
-            cam.backgroundColor = new Color(0.05f, 0.06f, 0.08f);
+            cam.orthographic = true;
+            cam.backgroundColor = new Color(0.10f, 0.08f, 0.05f);
+            cam.transform.position = new Vector3(0f, 0f, -10f);
 
-            // Angled, over-the-shoulder view looking down the length of the field for a 2.5D look.
-            float height = FieldConfig.Depth * 0.95f;
-            float back = FieldConfig.Depth * 1.15f;
-            cam.transform.position = new Vector3(0f, height, -back);
-            cam.transform.rotation = Quaternion.Euler(52f, 0f, 0f);
+            float halfHeight = GridConfig.Rows * GridConfig.CellSize * 0.5f + GridConfig.CellSize;
+            float halfWidthNeeded = GridConfig.Columns * GridConfig.CellSize * 0.5f + GridConfig.CellSize;
+            float aspect = cam.aspect > 0f ? cam.aspect : 16f / 9f;
+            cam.orthographicSize = Mathf.Max(halfHeight, halfWidthNeeded / aspect);
 
             return cam;
         }
