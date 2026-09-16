@@ -19,6 +19,7 @@ namespace AtomicSnake.Gameplay
         SnakeController _snake;
         UIManager _ui;
         Transform _fieldRoot;
+        WordTileView _wordTilePrefab;
 
         LevelDefinition _level;
         int _levelIndex;
@@ -32,11 +33,12 @@ namespace AtomicSnake.Gameplay
         bool _playing;
         bool _busy; // true while a transient message is showing and gameplay is paused
 
-        public void Initialize(SnakeController snake, Transform fieldRoot, UIManager ui)
+        public void Initialize(SnakeController snake, Transform fieldRoot, UIManager ui, WordTileView wordTilePrefab)
         {
             _snake = snake;
             _fieldRoot = fieldRoot;
             _ui = ui;
+            _wordTilePrefab = wordTilePrefab;
             _snake.OnSelfCollision += () => HandleCrash("You bit your own tail!");
             _snake.OnHitWall += () => HandleCrash("You crashed into the hedge!");
             _snake.OnHeadMoved += HandleHeadMoved;
@@ -80,7 +82,7 @@ namespace AtomicSnake.Gameplay
             {
                 var pos = FindSpawnPosition(occupied);
                 occupied.Add(pos);
-                _activeTiles.Add(WordTileView.Create(_fieldRoot, part, pos));
+                _activeTiles.Add(WordTileView.Create(_wordTilePrefab, _fieldRoot, part, pos));
             }
         }
 

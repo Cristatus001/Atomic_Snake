@@ -1,60 +1,49 @@
 using AtomicSnake.Field;
 using AtomicSnake.Gameplay;
-using AtomicSnake.Runtime;
 using AtomicSnake.Snake;
 using AtomicSnake.UI;
 using UnityEngine;
 
 namespace AtomicSnake.Bootstrap
 {
-    // Single entry point: builds the camera, field, snake, UI and gameplay
-    // controller at runtime, then wires the menu -> level select -> play flow.
+    // Wires the pre-built scene together and drives the menu -> level select
+    // -> play flow. Every visual (Canvas screens, snake, field, tiles) is
+    // authored as a real scene object or prefab, assigned below — this
+    // script only calls Initialize and subscribes to events, it never
+    // creates GameObjects or components itself.
     public class GameBootstrap : MonoBehaviour
     {
-        GameObject _fieldRoot;
-        GameplayController _gameplay;
-        UIManager _ui;
+        [SerializeField] GameObject fieldRoot;
+        [SerializeField] SnakeController snake;
+        [SerializeField] GameplayController gameplay;
+        [SerializeField] UIManager ui;
+        [SerializeField] WordTileView wordTilePrefab;
 
         void Awake()
         {
-            CameraRig.Setup();
+            snake.Initialize(fieldRoot.transform);
+            gameplay.Initialize(snake, fieldRoot.transform, ui, wordTilePrefab);
+            fieldRoot.SetActive(false);
 
-            _fieldRoot = new GameObject("FieldRoot");
-            FieldBackground.Build(_fieldRoot.transform);
-            _fieldRoot.SetActive(false);
+            ui.OnPlayClicked += () => ui.ShowLevelSelect();
+            ui.OnBackToMenu += () => ui.ShowMainMenu();
+            ui.OnLevelSelected += StartLevel;
+            ui.OnLevelCompleteContinue += ReturnToLevelSelect;
 
-            var snakeGo = new GameObject("Snake");
-            var snake = snakeGo.AddComponent<SnakeController>();
-            snakeGo.AddComponent<PlayerInputReader>();
-            snake.Initialize(_fieldRoot.transform);
-
-            var uiGo = new GameObject("UIManager");
-            _ui = uiGo.AddComponent<UIManager>();
-            _ui.BuildUi();
-
-            var gameplayGo = new GameObject("GameplayController");
-            _gameplay = gameplayGo.AddComponent<GameplayController>();
-            _gameplay.Initialize(snake, _fieldRoot.transform, _ui);
-
-            _ui.OnPlayClicked += () => _ui.ShowLevelSelect();
-            _ui.OnBackToMenu += () => _ui.ShowMainMenu();
-            _ui.OnLevelSelected += StartLevel;
-            _ui.OnLevelCompleteContinue += ReturnToLevelSelect;
-
-            _ui.ShowMainMenu();
+            ui.ShowMainMenu();
         }
 
         void StartLevel(int levelIndex)
         {
-            _fieldRoot.SetActive(true);
-            _gameplay.StartLevel(levelIndex);
+            fieldRoot.SetActive(true);
+            gameplay.StartLevel(levelIndex);
         }
 
         void ReturnToLevelSelect()
         {
-            _fieldRoot.SetActive(false);
-            _gameplay.StopLevel();
-            _ui.ShowLevelSelect();
+            fieldRoot.SetActive(false);
+            gameplay.StopLevel();
+            ui.ShowLevelSelect();
         }
     }
 }

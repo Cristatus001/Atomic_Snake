@@ -1,34 +1,11 @@
-using AtomicSnake.Bootstrap;
 using AtomicSnake.Chemistry;
-using UnityEditor;
-using UnityEditor.SceneManagement;
 using UnityEngine;
-using UnityEngine.SceneManagement;
 
 namespace AtomicSnake.EditorTools
 {
-    // Batch-mode helpers: -executeMethod AtomicSnake.EditorTools.AtomicSnakeSetup.<Method>
+    // Batch-mode helper: -executeMethod AtomicSnake.EditorTools.AtomicSnakeSetup.VerifyChemistry
     public static class AtomicSnakeSetup
     {
-        const string ScenePath = "Assets/Scenes/SampleScene.unity";
-
-        public static void SetupScene()
-        {
-            var scene = EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
-
-            var existing = Object.FindFirstObjectByType<GameBootstrap>();
-            if (existing == null)
-            {
-                var go = new GameObject("GameBootstrap");
-                go.AddComponent<GameBootstrap>();
-                Undo.RegisterCreatedObjectUndo(go, "Create GameBootstrap");
-            }
-
-            EditorSceneManager.MarkSceneDirty(scene);
-            EditorSceneManager.SaveScene(scene);
-            Debug.Log("AtomicSnakeSetup.SetupScene: done.");
-        }
-
         public static void VerifyChemistry()
         {
             void Check(int atomicNumber, string expected)

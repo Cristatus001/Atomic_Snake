@@ -7,28 +7,28 @@ namespace AtomicSnake.Snake
 {
     // Continuous movement: arrow keys/WASD pick a cardinal target heading and
     // the head steers smoothly toward it (Mathf.MoveTowardsAngle) instead of
-    // snapping between grid cells. The body is drawn as one smooth curve
-    // (LineRenderer) tracing the head's recent path, so turns look like a
-    // real snake instead of a blocky zig-zag.
+    // snapping between grid cells. The body is a single LineRenderer tracing
+    // the head's recent path. All sprite/material/color presentation lives
+    // on the SnakeHead and SnakeBody prefabs (assigned below), so an artist
+    // can restyle either without touching this script.
     public class SnakeController : MonoBehaviour
     {
         public event Action<Vector2> OnHeadMoved;
         public event Action OnSelfCollision;
         public event Action OnHitWall;
 
+        [SerializeField] Transform headPrefab;
+        [SerializeField] LineRenderer bodyPrefab;
+
         const float Speed = 3.4f;
         const float TurnRateDegreesPerSec = 240f;
         const float GrowthPerPickup = 0.5f;      // world units of body length added per correct pickup
         const float TrailSampleSpacing = 0.03f;
-        const float BodyThickness = 0.5f;
         const float SelfCollisionDistance = 0.28f;
         const float SelfCollisionSkipDistance = 0.5f; // ignore the neck right behind the head
 
-        static readonly Color HeadColor = new Color(0.16f, 0.38f, 0.86f);
-        static readonly Color BodyColor = new Color(0.30f, 0.68f, 0.36f);
-
         Transform _container;
-        SpriteRenderer _headVisual;
+        Transform _head;
         LineRenderer _bodyLine;
 
         Vector2 _headPosition;
@@ -46,6 +46,8 @@ namespace AtomicSnake.Snake
         public void Initialize(Transform container)
         {
             _container = container;
+            _head = Instantiate(headPrefab, _container);
+            _bodyLine = Instantiate(bodyPrefab, _container);
         }
 
         public void ResetSnake(Vector2 startPosition, int startLength, float startHeadingDegrees)
@@ -63,37 +65,8 @@ namespace AtomicSnake.Snake
             for (float d = totalBack; d >= 0f; d -= TrailSampleSpacing)
                 _trail.Add(startPosition + backward * d);
 
-            EnsureVisuals();
             RefreshVisuals();
             _active = true;
-        }
-
-        void EnsureVisuals()
-        {
-            if (_headVisual == null)
-            {
-                var go = new GameObject("Head");
-                go.transform.SetParent(_container, false);
-                _headVisual = go.AddComponent<SpriteRenderer>();
-                _headVisual.sortingOrder = 12;
-                _headVisual.sprite = SpriteFactory.GetCircle(HeadColor);
-            }
-            SpriteFactory.SetWorldSize(_headVisual, BodyThickness * 1.15f);
-
-            if (_bodyLine == null)
-            {
-                var go = new GameObject("BodyLine");
-                go.transform.SetParent(_container, false);
-                _bodyLine = go.AddComponent<LineRenderer>();
-                _bodyLine.useWorldSpace = false;
-                _bodyLine.numCapVertices = 8;
-                _bodyLine.numCornerVertices = 8;
-                _bodyLine.material = new Material(Shader.Find("Sprites/Default"));
-                _bodyLine.sortingOrder = 10;
-            }
-            _bodyLine.startColor = BodyColor;
-            _bodyLine.endColor = BodyColor;
-            _bodyLine.widthMultiplier = BodyThickness;
         }
 
         public void SetActive(bool value) => _active = value;
@@ -141,7 +114,7 @@ namespace AtomicSnake.Snake
 
         void RefreshVisuals()
         {
-            _headVisual.transform.localPosition = _headPosition;
+            _head.localPosition = _headPosition;
 
             _bodySamples.Clear();
             _bodySamples.Add(_headPosition);
