@@ -12,7 +12,9 @@ namespace AtomicSnake.Gameplay
     public class GameplayController : MonoBehaviour
     {
         const int StartLength = 4;
-        static readonly Vector2Int StartDirection = Vector2Int.right;
+        const float StartHeadingDegrees = 0f;
+        const float PickupDistance = 0.5f;
+        const float TileMinSeparation = 1f;
 
         SnakeController _snake;
         UIManager _ui;
@@ -35,7 +37,8 @@ namespace AtomicSnake.Gameplay
             _snake = snake;
             _fieldRoot = fieldRoot;
             _ui = ui;
-            _snake.OnSelfCollision += HandleSelfCollision;
+            _snake.OnSelfCollision += () => HandleCrash("You bit your own tail!");
+            _snake.OnHitWall += () => HandleCrash("You crashed into the hedge!");
             _snake.OnHeadMoved += HandleHeadMoved;
         }
 
@@ -49,7 +52,7 @@ namespace AtomicSnake.Gameplay
             _playing = true;
             _busy = false;
 
-            _snake.ResetSnake(new Vector2Int(GridConfig.Columns / 2, GridConfig.Rows / 2), StartLength, StartDirection);
+            _snake.ResetSnake(Vector2.zero, StartLength, StartHeadingDegrees);
             _snake.SetActive(true);
 
             _ui.ShowHud();
@@ -72,12 +75,12 @@ namespace AtomicSnake.Gameplay
         {
             ClearTiles();
 
-            var occupied = new HashSet<Vector2Int>(_snake.Cells);
+            var occupied = new List<Vector2>(_snake.BodySamples);
             foreach (string part in _sequence)
             {
-                var cell = FindEmptyCell(occupied);
-                occupied.Add(cell);
-                _activeTiles.Add(WordTileView.Create(_fieldRoot, part, cell));
+                var pos = FindSpawnPosition(occupied);
+                occupied.Add(pos);
+                _activeTiles.Add(WordTileView.Create(_fieldRoot, part, pos));
             }
         }
 
@@ -88,14 +91,23 @@ namespace AtomicSnake.Gameplay
             _activeTiles.Clear();
         }
 
-        Vector2Int FindEmptyCell(HashSet<Vector2Int> occupied)
+        Vector2 FindSpawnPosition(List<Vector2> occupied)
         {
-            for (int attempt = 0; attempt < 500; attempt++)
+            for (int attempt = 0; attempt < 200; attempt++)
             {
-                var cell = GridUtil.RandomCell();
-                if (!occupied.Contains(cell)) return cell;
+                var candidate = GridUtil.RandomPointInField();
+                bool clear = true;
+                foreach (var p in occupied)
+                {
+                    if (Vector2.Distance(p, candidate) < TileMinSeparation)
+                    {
+                        clear = false;
+                        break;
+                    }
+                }
+                if (clear) return candidate;
             }
-            return Vector2Int.zero;
+            return GridUtil.RandomPointInField();
         }
 
         void Update()
@@ -109,14 +121,14 @@ namespace AtomicSnake.Gameplay
                 StartCoroutine(HardResetRoutine("Time's up!"));
         }
 
-        void HandleHeadMoved(Vector2Int cell)
+        void HandleHeadMoved(Vector2 headPosition)
         {
             if (!_playing || _busy) return;
 
             WordTileView hit = null;
             foreach (var tile in _activeTiles)
             {
-                if (tile.Cell != cell) continue;
+                if (Vector2.Distance(tile.Position, headPosition) > PickupDistance) continue;
                 hit = tile;
                 break;
             }
@@ -164,10 +176,10 @@ namespace AtomicSnake.Gameplay
             StartQuestion();
         }
 
-        void HandleSelfCollision()
+        void HandleCrash(string message)
         {
             if (!_playing || _busy) return;
-            StartCoroutine(HardResetRoutine("Ouch! You hit your tail."));
+            StartCoroutine(HardResetRoutine(message));
         }
 
         IEnumerator HardResetRoutine(string message)
@@ -181,7 +193,7 @@ namespace AtomicSnake.Gameplay
             _score = 0;
             _questionIndex = 0;
             _timeRemaining = _level.TimeLimitSeconds;
-            _snake.ResetSnake(new Vector2Int(GridConfig.Columns / 2, GridConfig.Rows / 2), StartLength, StartDirection);
+            _snake.ResetSnake(Vector2.zero, StartLength, StartHeadingDegrees);
             _snake.SetActive(true);
             _busy = false;
             StartQuestion();

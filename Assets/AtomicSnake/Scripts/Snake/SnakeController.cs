@@ -5,139 +5,188 @@ using UnityEngine;
 
 namespace AtomicSnake.Snake
 {
-    // Classic grid-stepping snake: moves one cell per tick, wraps at the
-    // field edges, and reports self-collision so the caller can react.
+    // Continuous movement: arrow keys/WASD pick a cardinal target heading and
+    // the head steers smoothly toward it (Mathf.MoveTowardsAngle) instead of
+    // snapping between grid cells. The body is drawn as one smooth curve
+    // (LineRenderer) tracing the head's recent path, so turns look like a
+    // real snake instead of a blocky zig-zag.
     public class SnakeController : MonoBehaviour
     {
-        public event Action<Vector2Int> OnHeadMoved;
+        public event Action<Vector2> OnHeadMoved;
         public event Action OnSelfCollision;
+        public event Action OnHitWall;
 
-        [SerializeField] float moveInterval = 0.18f;
+        const float Speed = 3.4f;
+        const float TurnRateDegreesPerSec = 240f;
+        const float GrowthPerPickup = 0.5f;      // world units of body length added per correct pickup
+        const float TrailSampleSpacing = 0.03f;
+        const float BodyThickness = 0.5f;
+        const float SelfCollisionDistance = 0.28f;
+        const float SelfCollisionSkipDistance = 0.5f; // ignore the neck right behind the head
 
         static readonly Color HeadColor = new Color(0.16f, 0.38f, 0.86f);
         static readonly Color BodyColor = new Color(0.30f, 0.68f, 0.36f);
 
-        readonly List<Vector2Int> _cells = new();
-        readonly List<SpriteRenderer> _segments = new();
-
-        Vector2Int _direction;
-        Vector2Int _pendingDirection;
-        int _pendingGrowth;
-        float _tickTimer;
         Transform _container;
+        SpriteRenderer _headVisual;
+        LineRenderer _bodyLine;
+
+        Vector2 _headPosition;
+        float _heading;
+        float _targetHeading;
+        float _bodyLength;
         bool _active;
 
-        public IReadOnlyList<Vector2Int> Cells => _cells;
-        public Vector2Int HeadCell => _cells[0];
-        public int Length => _cells.Count;
+        readonly List<Vector2> _trail = new();
+        readonly List<Vector2> _bodySamples = new();
+
+        public Vector2 HeadPosition => _headPosition;
+        public IReadOnlyList<Vector2> BodySamples => _bodySamples;
 
         public void Initialize(Transform container)
         {
             _container = container;
         }
 
-        public void ResetSnake(Vector2Int startCell, int startLength, Vector2Int startDirection)
+        public void ResetSnake(Vector2 startPosition, int startLength, float startHeadingDegrees)
         {
-            foreach (var segment in _segments)
-                Destroy(segment.gameObject);
-            _segments.Clear();
-            _cells.Clear();
+            _trail.Clear();
+            _bodySamples.Clear();
 
-            _direction = startDirection;
-            _pendingDirection = startDirection;
-            _pendingGrowth = 0;
-            _tickTimer = 0f;
+            _headPosition = startPosition;
+            _heading = startHeadingDegrees;
+            _targetHeading = startHeadingDegrees;
+            _bodyLength = startLength * GrowthPerPickup;
 
-            for (int i = 0; i < startLength; i++)
-                _cells.Add(GridUtil.Wrap(startCell - startDirection * i));
+            var backward = HeadingToDirection(startHeadingDegrees + 180f);
+            float totalBack = _bodyLength + 1f;
+            for (float d = totalBack; d >= 0f; d -= TrailSampleSpacing)
+                _trail.Add(startPosition + backward * d);
 
-            for (int i = 0; i < startLength; i++)
-                _segments.Add(CreateSegmentVisual());
-
+            EnsureVisuals();
             RefreshVisuals();
             _active = true;
         }
 
+        void EnsureVisuals()
+        {
+            if (_headVisual == null)
+            {
+                var go = new GameObject("Head");
+                go.transform.SetParent(_container, false);
+                _headVisual = go.AddComponent<SpriteRenderer>();
+                _headVisual.sortingOrder = 12;
+                _headVisual.sprite = SpriteFactory.GetCircle(HeadColor);
+            }
+            SpriteFactory.SetWorldSize(_headVisual, BodyThickness * 1.15f);
+
+            if (_bodyLine == null)
+            {
+                var go = new GameObject("BodyLine");
+                go.transform.SetParent(_container, false);
+                _bodyLine = go.AddComponent<LineRenderer>();
+                _bodyLine.useWorldSpace = false;
+                _bodyLine.numCapVertices = 8;
+                _bodyLine.numCornerVertices = 8;
+                _bodyLine.material = new Material(Shader.Find("Sprites/Default"));
+                _bodyLine.sortingOrder = 10;
+            }
+            _bodyLine.startColor = BodyColor;
+            _bodyLine.endColor = BodyColor;
+            _bodyLine.widthMultiplier = BodyThickness;
+        }
+
         public void SetActive(bool value) => _active = value;
-
-        public void QueueGrowth(int amount = 1) => _pendingGrowth += amount;
-
-        public void TrySetDirection(Vector2Int dir)
-        {
-            if (dir == Vector2Int.zero || dir == -_direction) return;
-            _pendingDirection = dir;
-        }
-
-        public bool OccupiesCell(Vector2Int cell) => _cells.Contains(cell);
-
-        SpriteRenderer CreateSegmentVisual()
-        {
-            var go = new GameObject("SnakeSegment");
-            go.transform.SetParent(_container, false);
-            var sr = go.AddComponent<SpriteRenderer>();
-            sr.sprite = SpriteFactory.GetCircle(BodyColor);
-            sr.sortingOrder = 10;
-            return sr;
-        }
+        public void QueueGrowth(int amount = 1) => _bodyLength += amount * GrowthPerPickup;
+        public void SetTargetHeading(float degrees) => _targetHeading = degrees;
 
         void Update()
         {
             if (!_active) return;
 
-            _tickTimer += Time.deltaTime;
-            if (_tickTimer >= moveInterval)
-            {
-                _tickTimer -= moveInterval;
-                Step();
-            }
+            _heading = Mathf.MoveTowardsAngle(_heading, _targetHeading, TurnRateDegreesPerSec * Time.deltaTime);
+            var direction = HeadingToDirection(_heading);
+            _headPosition += direction * Speed * Time.deltaTime;
+
+            AppendTrail(_headPosition);
+            RefreshVisuals();
+
+            OnHeadMoved?.Invoke(_headPosition);
+
+            if (GridUtil.IsOutOfBounds(_headPosition))
+                OnHitWall?.Invoke();
+            else if (CheckSelfCollision())
+                OnSelfCollision?.Invoke();
         }
 
-        void Step()
+        void AppendTrail(Vector2 newPos)
         {
-            _direction = _pendingDirection;
-            var newHead = GridUtil.Wrap(_cells[0] + _direction);
-            bool willGrow = _pendingGrowth > 0;
+            if (_trail.Count == 0 || Vector2.Distance(_trail[^1], newPos) >= TrailSampleSpacing)
+                _trail.Add(newPos);
 
-            bool collided = false;
-            int bodyLimit = willGrow ? _cells.Count : _cells.Count - 1;
-            for (int i = 0; i < bodyLimit; i++)
+            float maxNeeded = _bodyLength + 0.5f;
+            float total = 0f;
+            int cut = 0;
+            for (int i = _trail.Count - 1; i > 0; i--)
             {
-                if (_cells[i] != newHead) continue;
-                collided = true;
-                break;
+                total += Vector2.Distance(_trail[i], _trail[i - 1]);
+                if (total > maxNeeded)
+                {
+                    cut = i - 1;
+                    break;
+                }
             }
-
-            _cells.Insert(0, newHead);
-            if (willGrow)
-            {
-                _pendingGrowth--;
-                _segments.Insert(0, CreateSegmentVisual());
-            }
-            else
-            {
-                _cells.RemoveAt(_cells.Count - 1);
-                var tailSegment = _segments[^1];
-                _segments.RemoveAt(_segments.Count - 1);
-                _segments.Insert(0, tailSegment);
-            }
-
-            RefreshVisuals();
-            OnHeadMoved?.Invoke(newHead);
-            if (collided)
-                OnSelfCollision?.Invoke();
+            if (cut > 0) _trail.RemoveRange(0, cut);
         }
 
         void RefreshVisuals()
         {
-            for (int i = 0; i < _segments.Count; i++)
+            _headVisual.transform.localPosition = _headPosition;
+
+            _bodySamples.Clear();
+            _bodySamples.Add(_headPosition);
+
+            float remaining = _bodyLength;
+            Vector2 prevPoint = _headPosition;
+            for (int i = _trail.Count - 1; i >= 0 && remaining > 0f; i--)
             {
-                var sr = _segments[i];
-                sr.transform.localPosition = GridUtil.CellToWorld(_cells[i]);
-                bool isHead = i == 0;
-                sr.sprite = SpriteFactory.GetCircle(isHead ? HeadColor : BodyColor);
-                sr.sortingOrder = isHead ? 12 : 10;
-                SpriteFactory.SetWorldSize(sr, GridConfig.CellSize * (isHead ? 0.92f : 0.8f));
+                Vector2 point = _trail[i];
+                float segLen = Vector2.Distance(prevPoint, point);
+                if (segLen >= remaining)
+                {
+                    float t = segLen > 0f ? remaining / segLen : 0f;
+                    _bodySamples.Add(Vector2.Lerp(prevPoint, point, t));
+                    remaining = 0f;
+                    break;
+                }
+                _bodySamples.Add(point);
+                remaining -= segLen;
+                prevPoint = point;
             }
+
+            _bodyLine.positionCount = _bodySamples.Count;
+            for (int i = 0; i < _bodySamples.Count; i++)
+                _bodyLine.SetPosition(i, _bodySamples[i]);
+        }
+
+        bool CheckSelfCollision()
+        {
+            float traveled = 0f;
+            for (int i = 1; i < _bodySamples.Count; i++)
+            {
+                traveled += Vector2.Distance(_bodySamples[i - 1], _bodySamples[i]);
+                if (traveled < SelfCollisionSkipDistance) continue;
+
+                if (Vector2.Distance(_headPosition, _bodySamples[i]) < SelfCollisionDistance)
+                    return true;
+            }
+            return false;
+        }
+
+        static Vector2 HeadingToDirection(float degrees)
+        {
+            float rad = degrees * Mathf.Deg2Rad;
+            return new Vector2(Mathf.Cos(rad), Mathf.Sin(rad));
         }
     }
 }

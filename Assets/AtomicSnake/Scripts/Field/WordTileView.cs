@@ -3,19 +3,20 @@ using UnityEngine;
 
 namespace AtomicSnake.Field
 {
-    // A single collectible word-part tile (e.g. "un", "nil", "ium") sitting on one grid cell.
+    // A single collectible word-part tile (e.g. "un", "nil", "ium") floating
+    // at one point in the continuous field.
     public class WordTileView : MonoBehaviour
     {
         static readonly Color TileColor = new Color(0.86f, 0.55f, 0.70f);
 
         public string Text { get; private set; }
-        public Vector2Int Cell { get; private set; }
+        public Vector2 Position { get; private set; }
 
-        public static WordTileView Create(Transform parent, string text, Vector2Int cell)
+        public static WordTileView Create(Transform parent, string text, Vector2 position)
         {
             var go = new GameObject($"Tile_{text}");
             go.transform.SetParent(parent, false);
-            go.transform.localPosition = GridUtil.CellToWorld(cell);
+            go.transform.localPosition = position;
 
             var sr = go.AddComponent<SpriteRenderer>();
             sr.sprite = SpriteFactory.GetCircle(TileColor);
@@ -37,7 +38,7 @@ namespace AtomicSnake.Field
 
             var tile = go.AddComponent<WordTileView>();
             tile.Text = text;
-            tile.Cell = cell;
+            tile.Position = position;
             return tile;
         }
     }
