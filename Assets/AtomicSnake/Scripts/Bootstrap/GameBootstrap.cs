@@ -31,7 +31,11 @@ namespace AtomicSnake.Bootstrap
         int _pendingLevelIndex;
         bool _instructionsForLevelStart;
 
-        void Awake()
+        // Start (not Awake): this wiring calls into UIManager's own Awake-time
+        // setup (HideAllPanels, button listeners), and Unity does not
+        // guarantee Awake() order between different GameObjects — running
+        // here guarantees UIManager.Awake() has already completed.
+        void Start()
         {
             snake.Initialize(fieldRoot.transform);
             gameplay.Initialize(snake, fieldRoot.transform, ui, wordTilePrefab, mapPickupPrefab, clockPickupPrefab, obstaclePrefab);
