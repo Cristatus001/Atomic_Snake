@@ -15,12 +15,18 @@ namespace AtomicSnake.Field
         public static WordTileView Create(WordTileView prefab, Transform parent, string text, Vector2 position)
         {
             var instance = Instantiate(prefab, parent);
-            instance.transform.localPosition = position;
             instance.Text = text;
-            instance.Position = position;
             if (instance.textHolder != null)
                 instance.textHolder.text = text;
+            instance.Reposition(position);
             return instance;
+        }
+
+        // Used to make a Level 2 "drifting" tile disappear and reappear elsewhere.
+        public void Reposition(Vector2 position)
+        {
+            transform.localPosition = position;
+            Position = position;
         }
     }
 }

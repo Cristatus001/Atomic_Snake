@@ -1,3 +1,4 @@
+using AtomicSnake.Chemistry;
 using AtomicSnake.Gameplay;
 using AtomicSnake.UI;
 using UnityEditor;
@@ -17,6 +18,9 @@ namespace AtomicSnake.EditorTools
         static readonly Color PanelBrown = new Color(0.42f, 0.29f, 0.16f, 0.95f);
         static readonly Color ButtonGreen = new Color(0.32f, 0.55f, 0.33f);
         static readonly Color ButtonLocked = new Color(0.45f, 0.45f, 0.45f);
+        static readonly Color TableHeaderColor = new Color(0.20f, 0.45f, 0.55f);
+        static readonly Color TableRowColor = new Color(0.10f, 0.14f, 0.22f, 0.9f);
+        static readonly Color MiniMapBackground = new Color(0.05f, 0.05f, 0.05f, 0.85f);
 
         public static GameObject Build(out UIManager uiManager)
         {
@@ -25,7 +29,7 @@ namespace AtomicSnake.EditorTools
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
             var scaler = canvasGo.AddComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            scaler.referenceResolution = new Vector2(1280, 720);
+            scaler.referenceResolution = new Vector2(1920, 1080); // GDD: Landscape 1920x1080
             canvasGo.AddComponent<GraphicRaycaster>();
 
             if (Object.FindFirstObjectByType<EventSystem>() == null)
@@ -37,10 +41,12 @@ namespace AtomicSnake.EditorTools
 
             var root = canvas.transform;
             var mainMenu = BuildMainMenu(root, out var playButton);
-            var levelSelect = BuildLevelSelect(root, out var levelButtons, out var levelLabels, out var backButton);
-            var hud = BuildHud(root, out var levelText, out var scoreText, out var trayText, out var timerText);
+            var levelSelect = BuildLevelSelect(root, out var levelButtons, out var levelLabels, out var backButton, out var howToPlayButton);
+            var hud = BuildHud(root, out var levelText, out var scoreText, out var trayText, out var timerText, out var miniMap);
             var levelComplete = BuildLevelComplete(root, out var completeText, out var continueButton);
             var message = BuildMessageOverlay(root, out var messageText);
+            var instructions = BuildInstructions(root, out var instructionsContinueButton);
+            var loading = BuildLoading(root, out var loadingFactText);
 
             var uiGo = new GameObject("UIManager");
             uiManager = uiGo.AddComponent<UIManager>();
@@ -51,6 +57,8 @@ namespace AtomicSnake.EditorTools
             so.FindProperty("hudPanel").objectReferenceValue = hud;
             so.FindProperty("levelCompletePanel").objectReferenceValue = levelComplete;
             so.FindProperty("messageOverlay").objectReferenceValue = message;
+            so.FindProperty("instructionsPanel").objectReferenceValue = instructions;
+            so.FindProperty("loadingPanel").objectReferenceValue = loading;
             so.FindProperty("playButton").objectReferenceValue = playButton;
 
             var levelButtonsProp = so.FindProperty("levelButtons");
@@ -64,13 +72,17 @@ namespace AtomicSnake.EditorTools
                 levelLabelsProp.GetArrayElementAtIndex(i).objectReferenceValue = levelLabels[i];
 
             so.FindProperty("backButton").objectReferenceValue = backButton;
+            so.FindProperty("howToPlayButton").objectReferenceValue = howToPlayButton;
             so.FindProperty("hudLevelText").objectReferenceValue = levelText;
             so.FindProperty("hudScoreText").objectReferenceValue = scoreText;
             so.FindProperty("hudTrayText").objectReferenceValue = trayText;
             so.FindProperty("hudTimerText").objectReferenceValue = timerText;
+            so.FindProperty("miniMap").objectReferenceValue = miniMap;
             so.FindProperty("levelCompleteText").objectReferenceValue = completeText;
             so.FindProperty("continueButton").objectReferenceValue = continueButton;
             so.FindProperty("messageText").objectReferenceValue = messageText;
+            so.FindProperty("instructionsContinueButton").objectReferenceValue = instructionsContinueButton;
+            so.FindProperty("loadingFactText").objectReferenceValue = loadingFactText;
             so.ApplyModifiedPropertiesWithoutUndo();
 
             return canvasGo;
@@ -85,7 +97,7 @@ namespace AtomicSnake.EditorTools
             return panel.gameObject;
         }
 
-        static GameObject BuildLevelSelect(Transform parent, out Button[] levelButtons, out Text[] levelLabels, out Button backButton)
+        static GameObject BuildLevelSelect(Transform parent, out Button[] levelButtons, out Text[] levelLabels, out Button backButton, out Button howToPlayButton)
         {
             var panel = CreatePanel(parent, "LevelSelectPanel", PanelBrown);
             CreateText(panel, "Title", "Choose a Garden Plot", 44, new Vector2(0, 260), new Vector2(900, 70), TextAnchor.MiddleCenter, Color.white);
@@ -102,11 +114,12 @@ namespace AtomicSnake.EditorTools
                 levelLabels[i] = label;
             }
 
-            backButton = CreateButton(panel, "BackButton", "Back", new Vector2(0, -260), new Vector2(220, 70), ButtonLocked);
+            backButton = CreateButton(panel, "BackButton", "Back", new Vector2(-150, -260), new Vector2(220, 70), ButtonLocked);
+            howToPlayButton = CreateButton(panel, "HowToPlayButton", "How to Play", new Vector2(150, -260), new Vector2(220, 70), ButtonGreen);
             return panel.gameObject;
         }
 
-        static GameObject BuildHud(Transform parent, out Text levelText, out Text scoreText, out Text trayText, out Text timerText)
+        static GameObject BuildHud(Transform parent, out Text levelText, out Text scoreText, out Text trayText, out Text timerText, out MiniMapView miniMap)
         {
             var panel = CreatePanel(parent, "HudPanel", new Color(0, 0, 0, 0));
 
@@ -126,7 +139,41 @@ namespace AtomicSnake.EditorTools
             Anchor(timer, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-90, -35));
             timerText = timer.GetComponent<Text>();
 
+            miniMap = BuildMiniMap(panel);
+
             return panel.gameObject;
+        }
+
+        static MiniMapView BuildMiniMap(Transform parent)
+        {
+            var go = new GameObject("MiniMapPanel", typeof(RectTransform));
+            var rect = go.GetComponent<RectTransform>();
+            rect.SetParent(parent, false);
+            rect.sizeDelta = new Vector2(280, 160);
+            Anchor(rect, new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-160, 100));
+
+            var background = go.AddComponent<Image>();
+            background.color = MiniMapBackground;
+
+            var mapArea = new GameObject("MapArea", typeof(RectTransform)).GetComponent<RectTransform>();
+            mapArea.SetParent(rect, false);
+            mapArea.anchorMin = Vector2.zero;
+            mapArea.anchorMax = Vector2.one;
+            mapArea.offsetMin = new Vector2(10, 10);
+            mapArea.offsetMax = new Vector2(-10, -10);
+
+            var tileDotPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(AtomicSnakePrefabBuilder.TileDotPath).GetComponent<RectTransform>();
+            var obstacleDotPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(AtomicSnakePrefabBuilder.ObstacleDotPath).GetComponent<RectTransform>();
+
+            var view = go.AddComponent<MiniMapView>();
+            var so = new SerializedObject(view);
+            so.FindProperty("mapArea").objectReferenceValue = mapArea;
+            so.FindProperty("tileDotPrefab").objectReferenceValue = tileDotPrefab;
+            so.FindProperty("obstacleDotPrefab").objectReferenceValue = obstacleDotPrefab;
+            so.ApplyModifiedPropertiesWithoutUndo();
+
+            go.SetActive(false);
+            return view;
         }
 
         static GameObject BuildLevelComplete(Transform parent, out Text completeText, out Button continueButton)
@@ -143,6 +190,94 @@ namespace AtomicSnake.EditorTools
             var panel = CreatePanel(parent, "MessageOverlay", new Color(0, 0, 0, 0.55f));
             var text = CreateText(panel, "MessageText", "", 40, Vector2.zero, new Vector2(900, 120), TextAnchor.MiddleCenter, Color.white);
             messageText = text.GetComponent<Text>();
+            return panel.gameObject;
+        }
+
+        static GameObject BuildInstructions(Transform parent, out Button continueButton)
+        {
+            var panel = CreatePanel(parent, "InstructionsPanel", PanelBrown);
+            CreateText(panel, "Title", "How to Play", 44, new Vector2(0, 300), new Vector2(900, 60), TextAnchor.MiddleCenter, Color.white);
+            CreateText(panel, "Body",
+                "Steer with arrow keys/WASD, or swipe/drag anywhere on the field.\n" +
+                "An atomic number (101-118) is shown — collect its word parts in the\n" +
+                "correct order to spell out its temporary IUPAC name before time runs out!",
+                20, new Vector2(0, 210), new Vector2(1000, 90), TextAnchor.MiddleCenter, Color.white);
+
+            BuildDigitRootTable(panel, new Vector2(0, -30));
+
+            continueButton = CreateButton(panel, "ContinueButton", "Got it!", new Vector2(0, -330), new Vector2(260, 70), ButtonGreen);
+            return panel.gameObject;
+        }
+
+        static void BuildDigitRootTable(Transform parent, Vector2 center)
+        {
+            const float rowHeight = 34f;
+            var columnWidths = new[] { 160f, 160f, 160f };
+            float tableWidth = columnWidths[0] + columnWidths[1] + columnWidths[2];
+            var headers = new[] { "Digit", "IUPAC Root", "Abbreviation" };
+
+            var table = CreateTableRoot(parent, center, tableWidth, rowHeight * 11);
+
+            for (int c = 0; c < headers.Length; c++)
+            {
+                float x = ColumnCenterX(columnWidths, tableWidth, c);
+                var pos = new Vector2(x, 0);
+                var size = new Vector2(columnWidths[c], rowHeight);
+                CreateCellBackground(table, $"Header_{c}_Bg", TableHeaderColor, pos, size);
+                CreateText(table, $"Header_{c}", headers[c], 20, pos, size, TextAnchor.MiddleCenter, Color.white);
+            }
+
+            var rows = IupacNaming.DigitRootTable();
+            for (int r = 0; r < rows.Count; r++)
+            {
+                float y = -rowHeight * (r + 1);
+                var values = new[] { rows[r].Digit.ToString(), rows[r].Root, rows[r].Abbreviation };
+                for (int c = 0; c < values.Length; c++)
+                {
+                    float x = ColumnCenterX(columnWidths, tableWidth, c);
+                    var pos = new Vector2(x, y);
+                    var size = new Vector2(columnWidths[c], rowHeight);
+                    CreateCellBackground(table, $"Row{r}_{c}_Bg", TableRowColor, pos, size);
+                    CreateText(table, $"Row{r}_{c}", values[c], 20, pos, size, TextAnchor.MiddleCenter, Color.white);
+                }
+            }
+        }
+
+        static void CreateCellBackground(Transform parent, string name, Color color, Vector2 anchoredPos, Vector2 size)
+        {
+            var go = new GameObject(name, typeof(RectTransform));
+            var rect = go.GetComponent<RectTransform>();
+            rect.SetParent(parent, false);
+            rect.sizeDelta = size;
+            rect.anchoredPosition = anchoredPos;
+
+            var image = go.AddComponent<Image>();
+            image.color = color;
+        }
+
+        static float ColumnCenterX(float[] columnWidths, float tableWidth, int column)
+        {
+            float precedingWidth = 0f;
+            for (int i = 0; i < column; i++) precedingWidth += columnWidths[i];
+            return -tableWidth / 2f + precedingWidth + columnWidths[column] / 2f;
+        }
+
+        static RectTransform CreateTableRoot(Transform parent, Vector2 center, float width, float height)
+        {
+            var go = new GameObject("DigitRootTable", typeof(RectTransform));
+            var rect = go.GetComponent<RectTransform>();
+            rect.SetParent(parent, false);
+            rect.sizeDelta = new Vector2(width, height);
+            rect.anchoredPosition = center;
+            return rect;
+        }
+
+        static GameObject BuildLoading(Transform parent, out Text factText)
+        {
+            var panel = CreatePanel(parent, "LoadingPanel", new Color(0.06f, 0.05f, 0.04f, 1f));
+            CreateText(panel, "LoadingLabel", "Loading...", 40, new Vector2(0, 80), new Vector2(600, 60), TextAnchor.MiddleCenter, Color.white);
+            var fact = CreateText(panel, "FactText", "", 22, new Vector2(0, -20), new Vector2(1100, 140), TextAnchor.MiddleCenter, Color.white);
+            factText = fact.GetComponent<Text>();
             return panel.gameObject;
         }
 

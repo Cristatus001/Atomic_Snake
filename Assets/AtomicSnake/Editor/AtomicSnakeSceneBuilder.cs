@@ -37,6 +37,9 @@ namespace AtomicSnake.EditorTools
             var snake = BuildSnake(fieldRoot.transform);
             var gameplay = new GameObject("GameplayController").AddComponent<GameplayController>();
             var wordTilePrefab = AssetDatabase.LoadAssetAtPath<GameObject>(AtomicSnakePrefabBuilder.WordTilePath).GetComponent<WordTileView>();
+            var mapPickupPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(AtomicSnakePrefabBuilder.MapPickupPath).GetComponent<PowerUpView>();
+            var clockPickupPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(AtomicSnakePrefabBuilder.ClockPickupPath).GetComponent<PowerUpView>();
+            var obstaclePrefab = AssetDatabase.LoadAssetAtPath<GameObject>(AtomicSnakePrefabBuilder.ObstaclePath).GetComponent<ObstacleView>();
 
             var canvasGo = AtomicSnakeUiBuilder.Build(out var uiManager);
 
@@ -49,6 +52,9 @@ namespace AtomicSnake.EditorTools
             so.FindProperty("gameplay").objectReferenceValue = gameplay;
             so.FindProperty("ui").objectReferenceValue = uiManager;
             so.FindProperty("wordTilePrefab").objectReferenceValue = wordTilePrefab;
+            so.FindProperty("mapPickupPrefab").objectReferenceValue = mapPickupPrefab;
+            so.FindProperty("clockPickupPrefab").objectReferenceValue = clockPickupPrefab;
+            so.FindProperty("obstaclePrefab").objectReferenceValue = obstaclePrefab;
             so.ApplyModifiedPropertiesWithoutUndo();
 
             EditorSceneManager.MarkSceneDirty(scene);

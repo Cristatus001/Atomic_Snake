@@ -15,30 +15,49 @@ namespace AtomicSnake.Gameplay
         const float StartHeadingDegrees = 0f;
         const float PickupDistance = 0.5f;
         const float TileMinSeparation = 1f;
+        const float ObstacleCollisionDistance = 0.45f;
+        const float ClockFreezeSeconds = 10f;
+        const float MapSpawnMin = 12f, MapSpawnMax = 20f;
+        const float ClockSpawnMin = 15f, ClockSpawnMax = 25f;
 
         SnakeController _snake;
         UIManager _ui;
         Transform _fieldRoot;
         WordTileView _wordTilePrefab;
+        PowerUpView _mapPrefab;
+        PowerUpView _clockPrefab;
+        ObstacleView _obstaclePrefab;
 
         LevelDefinition _level;
         int _levelIndex;
         int _questionIndex;
+        int _atomicNumber;
         List<string> _sequence;
         int _sequencePointer;
         readonly List<WordTileView> _activeTiles = new();
+        readonly List<ObstacleView> _obstacles = new();
 
         int _score;
         float _timeRemaining;
+        float _freezeRemaining;
+        float _driftTimer;
+        float _mapSpawnTimer;
+        float _clockSpawnTimer;
+        PowerUpView _activeMap;
+        PowerUpView _activeClock;
         bool _playing;
         bool _busy; // true while a transient message is showing and gameplay is paused
 
-        public void Initialize(SnakeController snake, Transform fieldRoot, UIManager ui, WordTileView wordTilePrefab)
+        public void Initialize(SnakeController snake, Transform fieldRoot, UIManager ui, WordTileView wordTilePrefab,
+            PowerUpView mapPrefab, PowerUpView clockPrefab, ObstacleView obstaclePrefab)
         {
             _snake = snake;
             _fieldRoot = fieldRoot;
             _ui = ui;
             _wordTilePrefab = wordTilePrefab;
+            _mapPrefab = mapPrefab;
+            _clockPrefab = clockPrefab;
+            _obstaclePrefab = obstaclePrefab;
             _snake.OnSelfCollision += () => HandleCrash("You bit your own tail!");
             _snake.OnHitWall += () => HandleCrash("You crashed into the hedge!");
             _snake.OnHeadMoved += HandleHeadMoved;
@@ -51,11 +70,16 @@ namespace AtomicSnake.Gameplay
             _score = 0;
             _questionIndex = 0;
             _timeRemaining = _level.TimeLimitSeconds;
+            _freezeRemaining = 0f;
             _playing = true;
             _busy = false;
 
             _snake.ResetSnake(Vector2.zero, StartLength, StartHeadingDegrees);
             _snake.SetActive(true);
+            _snake.SetSpeed(_level.SnakeSpeed);
+
+            SpawnObstacles();
+            ResetPowerUpTimers();
 
             _ui.ShowHud();
             StartQuestion();
@@ -63,11 +87,12 @@ namespace AtomicSnake.Gameplay
 
         void StartQuestion()
         {
-            int atomicNumber = _level.AtomicNumbers[_questionIndex];
-            _sequence = IupacNaming.GetCollectSequence(atomicNumber);
+            _atomicNumber = _level.AtomicNumbers[_questionIndex];
+            _sequence = IupacNaming.GetCollectSequence(_atomicNumber);
             _sequencePointer = 0;
+            _driftTimer = _level.DriftIntervalSeconds;
 
-            _ui.UpdateHud(_level.DisplayName, _questionIndex + 1, _level.ElementCount, atomicNumber, _score, _timeRemaining);
+            _ui.UpdateHud(_level.DisplayName, _questionIndex + 1, _level.ElementCount, _atomicNumber, _score, _timeRemaining);
             _ui.UpdateCollectedTray(_sequence, _sequencePointer);
 
             SpawnTilesForSequence();
@@ -77,12 +102,20 @@ namespace AtomicSnake.Gameplay
         {
             ClearTiles();
 
-            var occupied = new List<Vector2>(_snake.BodySamples);
+            var occupied = CurrentOccupiedPositions();
             foreach (string part in _sequence)
             {
                 var pos = FindSpawnPosition(occupied);
                 occupied.Add(pos);
                 _activeTiles.Add(WordTileView.Create(_wordTilePrefab, _fieldRoot, part, pos));
+            }
+
+            for (int i = 0; i < _level.DecoyTileCount; i++)
+            {
+                var pos = FindSpawnPosition(occupied);
+                occupied.Add(pos);
+                string decoyText = IupacNaming.RandomUnrelatedRoot(_atomicNumber);
+                _activeTiles.Add(WordTileView.Create(_wordTilePrefab, _fieldRoot, decoyText, pos));
             }
         }
 
@@ -91,6 +124,13 @@ namespace AtomicSnake.Gameplay
             foreach (var tile in _activeTiles)
                 if (tile != null) Destroy(tile.gameObject);
             _activeTiles.Clear();
+        }
+
+        List<Vector2> CurrentOccupiedPositions()
+        {
+            var occupied = new List<Vector2>(_snake.BodySamples);
+            foreach (var obstacle in _obstacles) occupied.Add(obstacle.Position);
+            return occupied;
         }
 
         Vector2 FindSpawnPosition(List<Vector2> occupied)
@@ -112,20 +152,119 @@ namespace AtomicSnake.Gameplay
             return GridUtil.RandomPointInField();
         }
 
+        void SpawnObstacles()
+        {
+            foreach (var obstacle in _obstacles)
+                if (obstacle != null) Destroy(obstacle.gameObject);
+            _obstacles.Clear();
+
+            var occupied = new List<Vector2>(_snake.BodySamples);
+            for (int i = 0; i < _level.ObstacleCount; i++)
+            {
+                var pos = FindSpawnPosition(occupied);
+                occupied.Add(pos);
+                _obstacles.Add(ObstacleView.Create(_obstaclePrefab, _fieldRoot, pos));
+            }
+        }
+
+        void ResetPowerUpTimers()
+        {
+            if (_activeMap != null) Destroy(_activeMap.gameObject);
+            if (_activeClock != null) Destroy(_activeClock.gameObject);
+            _activeMap = null;
+            _activeClock = null;
+            _ui.MiniMap.Hide();
+            _mapSpawnTimer = Random.Range(MapSpawnMin, MapSpawnMax);
+            _clockSpawnTimer = Random.Range(ClockSpawnMin, ClockSpawnMax);
+        }
+
         void Update()
         {
             if (!_playing || _busy) return;
 
-            _timeRemaining -= Time.deltaTime;
+            UpdateTimer();
+            UpdateDrift();
+            UpdatePowerUpSpawns();
+        }
+
+        void UpdateTimer()
+        {
+            if (_freezeRemaining > 0f)
+                _freezeRemaining -= Time.deltaTime;
+            else
+                _timeRemaining -= Time.deltaTime;
+
             _ui.UpdateTimer(Mathf.Max(0f, _timeRemaining));
 
             if (_timeRemaining <= 0f)
                 StartCoroutine(HardResetRoutine("Time's up!"));
         }
 
+        void UpdateDrift()
+        {
+            if (!_level.TilesDrift) return;
+
+            _driftTimer -= Time.deltaTime;
+            if (_driftTimer > 0f) return;
+            _driftTimer = _level.DriftIntervalSeconds;
+
+            var occupied = CurrentOccupiedPositions();
+            foreach (var tile in _activeTiles)
+            {
+                var pos = FindSpawnPosition(occupied);
+                occupied.Add(pos);
+                tile.Reposition(pos);
+            }
+        }
+
+        void UpdatePowerUpSpawns()
+        {
+            if (_activeMap == null)
+            {
+                _mapSpawnTimer -= Time.deltaTime;
+                if (_mapSpawnTimer <= 0f)
+                {
+                    var pos = FindSpawnPosition(CurrentOccupiedPositions());
+                    _activeMap = PowerUpView.Create(_mapPrefab, _fieldRoot, pos);
+                }
+            }
+
+            if (_activeClock == null)
+            {
+                _clockSpawnTimer -= Time.deltaTime;
+                if (_clockSpawnTimer <= 0f)
+                {
+                    var pos = FindSpawnPosition(CurrentOccupiedPositions());
+                    _activeClock = PowerUpView.Create(_clockPrefab, _fieldRoot, pos);
+                }
+            }
+        }
+
         void HandleHeadMoved(Vector2 headPosition)
         {
             if (!_playing || _busy) return;
+
+            if (CheckObstacleCollision(headPosition))
+            {
+                HandleCrash("You hit an obstacle!");
+                return;
+            }
+
+            if (_activeMap != null && Vector2.Distance(_activeMap.Position, headPosition) <= PickupDistance)
+            {
+                Destroy(_activeMap.gameObject);
+                _activeMap = null;
+                _mapSpawnTimer = Random.Range(MapSpawnMin, MapSpawnMax);
+                StartCoroutine(RevealMiniMapRoutine());
+            }
+
+            if (_activeClock != null && Vector2.Distance(_activeClock.Position, headPosition) <= PickupDistance)
+            {
+                Destroy(_activeClock.gameObject);
+                _activeClock = null;
+                _clockSpawnTimer = Random.Range(ClockSpawnMin, ClockSpawnMax);
+                _freezeRemaining += ClockFreezeSeconds;
+            }
 
             WordTileView hit = null;
             foreach (var tile in _activeTiles)
@@ -157,6 +296,28 @@ namespace AtomicSnake.Gameplay
                 _ui.UpdateCollectedTray(_sequence, _sequencePointer);
                 SpawnTilesForSequence();
             }
+        }
+
+        bool CheckObstacleCollision(Vector2 headPosition)
+        {
+            foreach (var obstacle in _obstacles)
+            {
+                if (Vector2.Distance(obstacle.Position, headPosition) < ObstacleCollisionDistance)
+                    return true;
+            }
+            return false;
+        }
+
+        IEnumerator RevealMiniMapRoutine()
+        {
+            var tilePositions = new List<Vector2>();
+            foreach (var tile in _activeTiles) tilePositions.Add(tile.Position);
+            var obstaclePositions = new List<Vector2>();
+            foreach (var obstacle in _obstacles) obstaclePositions.Add(obstacle.Position);
+
+            _ui.MiniMap.Show(tilePositions, obstaclePositions);
+            yield return new WaitForSeconds(_level.MapHintDuration);
+            _ui.MiniMap.Hide();
         }
 
         void HandleQuestionComplete()
@@ -195,8 +356,14 @@ namespace AtomicSnake.Gameplay
             _score = 0;
             _questionIndex = 0;
             _timeRemaining = _level.TimeLimitSeconds;
+            _freezeRemaining = 0f;
             _snake.ResetSnake(Vector2.zero, StartLength, StartHeadingDegrees);
             _snake.SetActive(true);
+            _snake.SetSpeed(_level.SnakeSpeed);
+
+            SpawnObstacles();
+            ResetPowerUpTimers();
+
             _busy = false;
             StartQuestion();
         }
@@ -207,6 +374,10 @@ namespace AtomicSnake.Gameplay
             _busy = false;
             _snake.SetActive(false);
             ClearTiles();
+            ResetPowerUpTimers();
+            foreach (var obstacle in _obstacles)
+                if (obstacle != null) Destroy(obstacle.gameObject);
+            _obstacles.Clear();
             StopAllCoroutines();
         }
     }

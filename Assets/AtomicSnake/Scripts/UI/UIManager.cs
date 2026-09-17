@@ -17,6 +17,8 @@ namespace AtomicSnake.UI
         public event Action<int> OnLevelSelected;
         public event Action OnBackToMenu;
         public event Action OnLevelCompleteContinue;
+        public event Action OnHowToPlayClicked;
+        public event Action OnInstructionsContinue;
 
         [Header("Screens")]
         [SerializeField] GameObject mainMenuPanel;
@@ -24,6 +26,8 @@ namespace AtomicSnake.UI
         [SerializeField] GameObject hudPanel;
         [SerializeField] GameObject levelCompletePanel;
         [SerializeField] GameObject messageOverlay;
+        [SerializeField] GameObject instructionsPanel;
+        [SerializeField] GameObject loadingPanel;
 
         [Header("Main Menu")]
         [SerializeField] Button playButton;
@@ -32,12 +36,14 @@ namespace AtomicSnake.UI
         [SerializeField] Button[] levelButtons;
         [SerializeField] Text[] levelButtonLabels;
         [SerializeField] Button backButton;
+        [SerializeField] Button howToPlayButton;
 
         [Header("HUD")]
         [SerializeField] Text hudLevelText;
         [SerializeField] Text hudScoreText;
         [SerializeField] Text hudTrayText;
         [SerializeField] Text hudTimerText;
+        [SerializeField] MiniMapView miniMap;
 
         [Header("Level Complete")]
         [SerializeField] Text levelCompleteText;
@@ -46,11 +52,21 @@ namespace AtomicSnake.UI
         [Header("Message")]
         [SerializeField] Text messageText;
 
+        [Header("Instructions")]
+        [SerializeField] Button instructionsContinueButton;
+
+        [Header("Loading")]
+        [SerializeField] Text loadingFactText;
+
+        public MiniMapView MiniMap => miniMap;
+
         void Awake()
         {
             playButton.onClick.AddListener(() => OnPlayClicked?.Invoke());
             backButton.onClick.AddListener(() => OnBackToMenu?.Invoke());
             continueButton.onClick.AddListener(() => OnLevelCompleteContinue?.Invoke());
+            howToPlayButton.onClick.AddListener(() => OnHowToPlayClicked?.Invoke());
+            instructionsContinueButton.onClick.AddListener(() => OnInstructionsContinue?.Invoke());
 
             for (int i = 0; i < levelButtons.Length; i++)
             {
@@ -68,6 +84,9 @@ namespace AtomicSnake.UI
             hudPanel.SetActive(false);
             levelCompletePanel.SetActive(false);
             messageOverlay.SetActive(false);
+            instructionsPanel.SetActive(false);
+            loadingPanel.SetActive(false);
+            miniMap.Hide();
         }
 
         public void ShowMainMenu()
@@ -94,6 +113,19 @@ namespace AtomicSnake.UI
             HideAllPanels();
             levelCompleteText.text = $"{levelName} complete!\nScore: {score}";
             levelCompletePanel.SetActive(true);
+        }
+
+        public void ShowInstructions()
+        {
+            HideAllPanels();
+            instructionsPanel.SetActive(true);
+        }
+
+        public void ShowLoading(string fact)
+        {
+            HideAllPanels();
+            loadingFactText.text = fact;
+            loadingPanel.SetActive(true);
         }
 
         public void ShowMessage(string message)

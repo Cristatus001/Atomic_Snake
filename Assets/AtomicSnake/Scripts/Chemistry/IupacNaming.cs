@@ -14,9 +14,38 @@ namespace AtomicSnake.Chemistry
             "nil", "un", "bi", "tri", "quad", "pent", "hex", "sept", "oct", "enn"
         };
 
+        static readonly string[] AbbreviationByDigit =
+        {
+            "n", "u", "b", "t", "q", "p", "h", "s", "o", "e"
+        };
+
         public const string Suffix = "ium";
 
         public static string RootForDigit(int digit) => RootByDigit[digit];
+        public static string AbbreviationForDigit(int digit) => AbbreviationByDigit[digit];
+
+        // The full 0-9 digit/root/abbreviation table, for the instructions screen.
+        public static IReadOnlyList<(int Digit, string Root, string Abbreviation)> DigitRootTable()
+        {
+            var rows = new List<(int, string, string)>(RootByDigit.Length);
+            for (int digit = 0; digit < RootByDigit.Length; digit++)
+                rows.Add((digit, RootByDigit[digit], AbbreviationByDigit[digit]));
+            return rows;
+        }
+
+        // A root not used anywhere in this atomic number's own sequence — for
+        // generating decoy word-parts that are never accidentally "correct".
+        public static string RandomUnrelatedRoot(int atomicNumber)
+        {
+            var used = new HashSet<string>(GetCollectSequence(atomicNumber));
+            var pool = new List<string>();
+            foreach (var root in RootByDigit)
+                if (!used.Contains(root))
+                    pool.Add(root);
+            return pool.Count > 0
+                ? pool[UnityEngine.Random.Range(0, pool.Count)]
+                : RootByDigit[UnityEngine.Random.Range(0, RootByDigit.Length)];
+        }
 
         // The ordered list of collectible word-parts for a given atomic number,
         // e.g. 103 -> ["un", "nil", "tri", "ium"].

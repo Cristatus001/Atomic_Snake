@@ -20,7 +20,7 @@ namespace AtomicSnake.Snake
         [SerializeField] Transform headPrefab;
         [SerializeField] LineRenderer bodyPrefab;
 
-        const float Speed = 3.4f;
+        const float DefaultSpeed = 3.4f;
         const float TurnRateDegreesPerSec = 240f;
         const float GrowthPerPickup = 0.5f;      // world units of body length added per correct pickup
         const float TrailSampleSpacing = 0.03f;
@@ -35,6 +35,7 @@ namespace AtomicSnake.Snake
         float _heading;
         float _targetHeading;
         float _bodyLength;
+        float _speed = DefaultSpeed;
         bool _active;
 
         readonly List<Vector2> _trail = new();
@@ -59,6 +60,7 @@ namespace AtomicSnake.Snake
             _heading = startHeadingDegrees;
             _targetHeading = startHeadingDegrees;
             _bodyLength = startLength * GrowthPerPickup;
+            _speed = DefaultSpeed;
 
             var backward = HeadingToDirection(startHeadingDegrees + 180f);
             float totalBack = _bodyLength + 1f;
@@ -72,6 +74,7 @@ namespace AtomicSnake.Snake
         public void SetActive(bool value) => _active = value;
         public void QueueGrowth(int amount = 1) => _bodyLength += amount * GrowthPerPickup;
         public void SetTargetHeading(float degrees) => _targetHeading = degrees;
+        public void SetSpeed(float unitsPerSecond) => _speed = unitsPerSecond > 0f ? unitsPerSecond : DefaultSpeed;
 
         void Update()
         {
@@ -79,7 +82,7 @@ namespace AtomicSnake.Snake
 
             _heading = Mathf.MoveTowardsAngle(_heading, _targetHeading, TurnRateDegreesPerSec * Time.deltaTime);
             var direction = HeadingToDirection(_heading);
-            _headPosition += direction * Speed * Time.deltaTime;
+            _headPosition += direction * _speed * Time.deltaTime;
 
             AppendTrail(_headPosition);
             RefreshVisuals();

@@ -1,22 +1,31 @@
 using AtomicSnake.Field;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace AtomicSnake.EditorTools
 {
-    // Builds the SnakeHead, SnakeBody and WordTile prefabs as real, persisted
-    // assets with SpriteHolder/TextHolder child objects, so an artist can
-    // open any of them and swap the sprite, font, color or scale directly
-    // in the Inspector.
+    // Builds the SnakeHead, SnakeBody, WordTile, power-up and obstacle
+    // prefabs as real, persisted assets with SpriteHolder/TextHolder child
+    // objects, so an artist can open any of them and swap the sprite, font,
+    // color or scale directly in the Inspector.
     public static class AtomicSnakePrefabBuilder
     {
         public const string PrefabDir = "Assets/AtomicSnake/Prefabs";
         public const string SnakeHeadPath = PrefabDir + "/SnakeHead.prefab";
         public const string SnakeBodyPath = PrefabDir + "/SnakeBody.prefab";
         public const string WordTilePath = PrefabDir + "/WordTile.prefab";
+        public const string MapPickupPath = PrefabDir + "/MapPickup.prefab";
+        public const string ClockPickupPath = PrefabDir + "/ClockPickup.prefab";
+        public const string ObstaclePath = PrefabDir + "/Obstacle.prefab";
+        public const string TileDotPath = PrefabDir + "/TileDot.prefab";
+        public const string ObstacleDotPath = PrefabDir + "/ObstacleDot.prefab";
 
         static readonly Color HeadColor = new Color(0.16f, 0.38f, 0.86f);
         static readonly Color TileColor = new Color(0.86f, 0.55f, 0.70f);
+        static readonly Color MapColor = new Color(0.20f, 0.70f, 0.75f);
+        static readonly Color ClockColor = new Color(0.90f, 0.65f, 0.20f);
+        static readonly Color ObstacleColor = new Color(0.40f, 0.36f, 0.34f);
 
         public static void BuildAll()
         {
@@ -28,6 +37,11 @@ namespace AtomicSnake.EditorTools
             BuildSnakeHead(circleSprite);
             BuildSnakeBody(bodyMaterial);
             BuildWordTile(circleSprite);
+            BuildPowerUp(circleSprite, MapPickupPath, "MAP", Field.PowerUpType.Map, MapColor);
+            BuildPowerUp(circleSprite, ClockPickupPath, "CLOCK", Field.PowerUpType.Clock, ClockColor);
+            BuildObstacle(circleSprite);
+            BuildMapDot(circleSprite, TileDotPath, TileColor);
+            BuildMapDot(circleSprite, ObstacleDotPath, ObstacleColor);
 
             AssetDatabase.SaveAssets();
             Debug.Log("AtomicSnakePrefabBuilder: prefabs built.");
@@ -93,6 +107,68 @@ namespace AtomicSnake.EditorTools
             so.ApplyModifiedPropertiesWithoutUndo();
 
             SaveAndDestroy(root, WordTilePath);
+        }
+
+        static void BuildPowerUp(Sprite sprite, string path, string label, Field.PowerUpType type, Color color)
+        {
+            var root = new GameObject(label + "Pickup");
+
+            var holder = new GameObject("SpriteHolder");
+            holder.transform.SetParent(root.transform, false);
+            holder.transform.localScale = Vector3.one * ScaleForDiameter(sprite, 0.5f);
+            var sr = holder.AddComponent<SpriteRenderer>();
+            sr.sprite = sprite;
+            sr.color = color;
+            sr.sortingOrder = 5;
+
+            var textHolder = new GameObject("TextHolder");
+            textHolder.transform.SetParent(root.transform, false);
+            textHolder.transform.localPosition = new Vector3(0f, 0f, -0.01f);
+            var mesh = textHolder.AddComponent<TextMesh>();
+            mesh.text = label;
+            mesh.characterSize = 0.06f;
+            mesh.fontSize = 48;
+            mesh.anchor = TextAnchor.MiddleCenter;
+            mesh.alignment = TextAlignment.Center;
+            mesh.color = Color.white;
+            textHolder.GetComponent<MeshRenderer>().sortingOrder = 6;
+
+            var view = root.AddComponent<PowerUpView>();
+            var so = new SerializedObject(view);
+            so.FindProperty("type").enumValueIndex = (int)type;
+            so.ApplyModifiedPropertiesWithoutUndo();
+
+            SaveAndDestroy(root, path);
+        }
+
+        static void BuildObstacle(Sprite sprite)
+        {
+            var root = new GameObject("Obstacle");
+
+            var holder = new GameObject("SpriteHolder");
+            holder.transform.SetParent(root.transform, false);
+            holder.transform.localScale = Vector3.one * ScaleForDiameter(sprite, 0.6f);
+            var sr = holder.AddComponent<SpriteRenderer>();
+            sr.sprite = sprite;
+            sr.color = ObstacleColor;
+            sr.sortingOrder = 4;
+
+            root.AddComponent<ObstacleView>();
+
+            SaveAndDestroy(root, ObstaclePath);
+        }
+
+        static void BuildMapDot(Sprite sprite, string path, Color color)
+        {
+            var root = new GameObject("Dot", typeof(RectTransform));
+            var rect = root.GetComponent<RectTransform>();
+            rect.sizeDelta = new Vector2(10f, 10f);
+
+            var image = root.AddComponent<Image>();
+            image.sprite = sprite;
+            image.color = color;
+
+            SaveAndDestroy(root, path);
         }
 
         static float ScaleForDiameter(Sprite sprite, float desiredWorldDiameter)
