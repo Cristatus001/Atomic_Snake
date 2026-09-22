@@ -21,26 +21,39 @@ namespace AtomicSnake.EditorTools
         public const string TileDotPath = PrefabDir + "/TileDot.prefab";
         public const string ObstacleDotPath = PrefabDir + "/ObstacleDot.prefab";
 
-        static readonly Color HeadColor = new Color(0.16f, 0.38f, 0.86f);
-        static readonly Color TileColor = new Color(0.86f, 0.55f, 0.70f);
+        static readonly Color HeadColor = new Color(0.36f, 0.60f, 0.24f);
+        static readonly Color EyeColor = new Color(0.05f, 0.05f, 0.05f);
+        static readonly Color LabelChipColor = new Color(0.12f, 0.10f, 0.10f, 0.72f);
         static readonly Color MapColor = new Color(0.20f, 0.70f, 0.75f);
         static readonly Color ClockColor = new Color(0.90f, 0.65f, 0.20f);
         static readonly Color ObstacleColor = new Color(0.40f, 0.36f, 0.34f);
+
+        // Matches the reference design's varied egg colors (yellow/pink/blue/purple);
+        // WordTileView picks one deterministically from each tile's text.
+        static readonly Color[] TilePalette =
+        {
+            new Color(0.95f, 0.75f, 0.20f), // yellow
+            new Color(0.92f, 0.45f, 0.55f), // pink
+            new Color(0.30f, 0.55f, 0.85f), // blue
+            new Color(0.65f, 0.45f, 0.80f), // purple
+        };
 
         public static void BuildAll()
         {
             System.IO.Directory.CreateDirectory(PrefabDir);
 
             var circleSprite = AssetDatabase.LoadAssetAtPath<Sprite>(AtomicSnakeArtGenerator.CirclePath);
+            var eggSprite = AssetDatabase.LoadAssetAtPath<Sprite>(AtomicSnakeArtGenerator.EggPath);
+            var roundedRectSprite = AssetDatabase.LoadAssetAtPath<Sprite>(AtomicSnakeArtGenerator.RoundedRectPath);
             var bodyMaterial = AssetDatabase.LoadAssetAtPath<Material>(AtomicSnakeArtGenerator.BodyMaterialPath);
 
             BuildSnakeHead(circleSprite);
             BuildSnakeBody(bodyMaterial);
-            BuildWordTile(circleSprite);
+            BuildWordTile(eggSprite, roundedRectSprite);
             BuildPowerUp(circleSprite, MapPickupPath, "MAP", Field.PowerUpType.Map, MapColor);
             BuildPowerUp(circleSprite, ClockPickupPath, "CLOCK", Field.PowerUpType.Clock, ClockColor);
             BuildObstacle(circleSprite);
-            BuildMapDot(circleSprite, TileDotPath, TileColor);
+            BuildMapDot(circleSprite, TileDotPath, TilePalette[1]);
             BuildMapDot(circleSprite, ObstacleDotPath, ObstacleColor);
 
             AssetDatabase.SaveAssets();
@@ -59,7 +72,23 @@ namespace AtomicSnake.EditorTools
             sr.color = HeadColor;
             sr.sortingOrder = 12;
 
+            // Two small eyes toward the default facing direction (+X) for character.
+            CreateEye(root.transform, sprite, new Vector3(0.16f, 0.10f, -0.01f));
+            CreateEye(root.transform, sprite, new Vector3(0.16f, -0.10f, -0.01f));
+
             SaveAndDestroy(root, SnakeHeadPath);
+        }
+
+        static void CreateEye(Transform parent, Sprite sprite, Vector3 localPosition)
+        {
+            var eye = new GameObject("Eye");
+            eye.transform.SetParent(parent, false);
+            eye.transform.localPosition = localPosition;
+            eye.transform.localScale = Vector3.one * ScaleForDiameter(sprite, 0.12f);
+            var sr = eye.AddComponent<SpriteRenderer>();
+            sr.sprite = sprite;
+            sr.color = EyeColor;
+            sr.sortingOrder = 13;
         }
 
         static void BuildSnakeBody(Material material)
@@ -77,17 +106,27 @@ namespace AtomicSnake.EditorTools
             SaveAndDestroy(root, SnakeBodyPath);
         }
 
-        static void BuildWordTile(Sprite sprite)
+        static void BuildWordTile(Sprite eggSprite, Sprite roundedRectSprite)
         {
             var root = new GameObject("WordTile");
 
             var holder = new GameObject("SpriteHolder");
             holder.transform.SetParent(root.transform, false);
-            holder.transform.localScale = Vector3.one * ScaleForDiameter(sprite, 0.53f);
+            holder.transform.localScale = Vector3.one * ScaleForDiameter(eggSprite, 0.56f);
             var sr = holder.AddComponent<SpriteRenderer>();
-            sr.sprite = sprite;
-            sr.color = TileColor;
-            sr.sortingOrder = 5;
+            sr.sprite = eggSprite;
+            sr.color = TilePalette[0];
+            sr.sortingOrder = 4;
+
+            var chip = new GameObject("LabelChip");
+            chip.transform.SetParent(root.transform, false);
+            chip.transform.localPosition = new Vector3(0f, 0f, -0.005f);
+            var chipRenderer = chip.AddComponent<SpriteRenderer>();
+            chipRenderer.sprite = roundedRectSprite;
+            chipRenderer.drawMode = SpriteDrawMode.Sliced;
+            chipRenderer.size = new Vector2(0.46f, 0.20f);
+            chipRenderer.color = LabelChipColor;
+            chipRenderer.sortingOrder = 5;
 
             var textHolder = new GameObject("TextHolder");
             textHolder.transform.SetParent(root.transform, false);
@@ -104,6 +143,11 @@ namespace AtomicSnake.EditorTools
             var view = root.AddComponent<WordTileView>();
             var so = new SerializedObject(view);
             so.FindProperty("textHolder").objectReferenceValue = mesh;
+            so.FindProperty("spriteHolder").objectReferenceValue = sr;
+            var paletteProp = so.FindProperty("palette");
+            paletteProp.arraySize = TilePalette.Length;
+            for (int i = 0; i < TilePalette.Length; i++)
+                paletteProp.GetArrayElementAtIndex(i).colorValue = TilePalette[i];
             so.ApplyModifiedPropertiesWithoutUndo();
 
             SaveAndDestroy(root, WordTilePath);

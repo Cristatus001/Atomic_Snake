@@ -17,13 +17,22 @@ namespace AtomicSnake.EditorTools
     {
         static readonly Color PanelBrown = new Color(0.42f, 0.29f, 0.16f, 0.95f);
         static readonly Color ButtonGreen = new Color(0.32f, 0.55f, 0.33f);
+        static readonly Color ButtonTeal = new Color(0.22f, 0.62f, 0.64f);
         static readonly Color ButtonLocked = new Color(0.45f, 0.45f, 0.45f);
+        static readonly Color BadgeWhite = new Color(0.96f, 0.95f, 0.90f);
+        static readonly Color BadgeTan = new Color(0.80f, 0.72f, 0.58f);
+        static readonly Color BadgeTeal = new Color(0.22f, 0.62f, 0.64f, 0.92f);
         static readonly Color TableHeaderColor = new Color(0.20f, 0.45f, 0.55f);
         static readonly Color TableRowColor = new Color(0.10f, 0.14f, 0.22f, 0.9f);
         static readonly Color MiniMapBackground = new Color(0.05f, 0.05f, 0.05f, 0.85f);
+        static readonly Color TextDark = new Color(0.20f, 0.14f, 0.08f);
+
+        static Sprite _roundedRectSprite;
 
         public static GameObject Build(out UIManager uiManager)
         {
+            _roundedRectSprite = AssetDatabase.LoadAssetAtPath<Sprite>(AtomicSnakeArtGenerator.RoundedRectPath);
+
             var canvasGo = new GameObject("Canvas");
             var canvas = canvasGo.AddComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
@@ -93,7 +102,7 @@ namespace AtomicSnake.EditorTools
             var panel = CreatePanel(parent, "MainMenuPanel", new Color(0, 0, 0, 0));
             CreateText(panel, "Title", "Atomic Snake", 64, new Vector2(0, 120), new Vector2(900, 100), TextAnchor.MiddleCenter, Color.white);
             CreateText(panel, "Subtitle", "Grow your snake. Name the elements.", 28, new Vector2(0, 40), new Vector2(900, 60), TextAnchor.MiddleCenter, Color.white);
-            playButton = CreateButton(panel, "PlayButton", "Play", new Vector2(0, -60), new Vector2(260, 80), ButtonGreen);
+            playButton = CreateButton(panel, "PlayButton", "Play", new Vector2(0, -60), new Vector2(260, 80), ButtonTeal);
             return panel.gameObject;
         }
 
@@ -115,7 +124,7 @@ namespace AtomicSnake.EditorTools
             }
 
             backButton = CreateButton(panel, "BackButton", "Back", new Vector2(-150, -260), new Vector2(220, 70), ButtonLocked);
-            howToPlayButton = CreateButton(panel, "HowToPlayButton", "How to Play", new Vector2(150, -260), new Vector2(220, 70), ButtonGreen);
+            howToPlayButton = CreateButton(panel, "HowToPlayButton", "How to Play", new Vector2(150, -260), new Vector2(220, 70), ButtonTeal);
             return panel.gameObject;
         }
 
@@ -123,20 +132,24 @@ namespace AtomicSnake.EditorTools
         {
             var panel = CreatePanel(parent, "HudPanel", new Color(0, 0, 0, 0));
 
-            var topLeft = CreateText(panel, "LevelText", "", 22, Vector2.zero, new Vector2(360, 90), TextAnchor.UpperLeft, Color.white);
-            Anchor(topLeft, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(190, -55));
+            var levelBadge = CreateBadge(panel, "LevelBadge", BadgeTan, Vector2.zero, new Vector2(380, 100));
+            Anchor(levelBadge, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(200, -60));
+            var topLeft = CreateText(levelBadge, "LevelText", "", 20, Vector2.zero, new Vector2(360, 90), TextAnchor.MiddleCenter, TextDark);
             levelText = topLeft.GetComponent<Text>();
 
-            var score = CreateText(panel, "ScoreText", "Score: 0", 22, Vector2.zero, new Vector2(220, 40), TextAnchor.UpperLeft, Color.white);
-            Anchor(score, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(120, -95));
+            var scoreBadge = CreateBadge(panel, "ScoreBadge", BadgeWhite, Vector2.zero, new Vector2(220, 50));
+            Anchor(scoreBadge, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(120, -160));
+            var score = CreateText(scoreBadge, "ScoreText", "Score: 0", 22, Vector2.zero, new Vector2(200, 40), TextAnchor.MiddleCenter, TextDark);
             scoreText = score.GetComponent<Text>();
 
-            var tray = CreateText(panel, "TrayText", "Collected:", 22, Vector2.zero, new Vector2(520, 50), TextAnchor.MiddleCenter, Color.white);
-            Anchor(tray, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0, -35));
+            var trayBadge = CreateBadge(panel, "TrayBadge", BadgeTeal, Vector2.zero, new Vector2(560, 55));
+            Anchor(trayBadge, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0, -35));
+            var tray = CreateText(trayBadge, "TrayText", "Collected:", 22, Vector2.zero, new Vector2(540, 50), TextAnchor.MiddleCenter, Color.white);
             trayText = tray.GetComponent<Text>();
 
-            var timer = CreateText(panel, "TimerText", "", 26, Vector2.zero, new Vector2(140, 50), TextAnchor.UpperRight, Color.white);
-            Anchor(timer, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-90, -35));
+            var timerBadge = CreateBadge(panel, "TimerBadge", BadgeWhite, Vector2.zero, new Vector2(120, 90));
+            Anchor(timerBadge, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-90, -60));
+            var timer = CreateText(timerBadge, "TimerText", "", 28, Vector2.zero, new Vector2(110, 80), TextAnchor.MiddleCenter, TextDark);
             timerText = timer.GetComponent<Text>();
 
             miniMap = BuildMiniMap(panel);
@@ -181,7 +194,7 @@ namespace AtomicSnake.EditorTools
             var panel = CreatePanel(parent, "LevelCompletePanel", PanelBrown);
             var text = CreateText(panel, "CompleteText", "", 36, new Vector2(0, 60), new Vector2(800, 160), TextAnchor.MiddleCenter, Color.white);
             completeText = text.GetComponent<Text>();
-            continueButton = CreateButton(panel, "ContinueButton", "Continue", new Vector2(0, -80), new Vector2(260, 80), ButtonGreen);
+            continueButton = CreateButton(panel, "ContinueButton", "Continue", new Vector2(0, -80), new Vector2(260, 80), ButtonTeal);
             return panel.gameObject;
         }
 
@@ -205,7 +218,7 @@ namespace AtomicSnake.EditorTools
 
             BuildDigitRootTable(panel, new Vector2(0, -30));
 
-            continueButton = CreateButton(panel, "ContinueButton", "Got it!", new Vector2(0, -330), new Vector2(260, 70), ButtonGreen);
+            continueButton = CreateButton(panel, "ContinueButton", "Got it!", new Vector2(0, -330), new Vector2(260, 70), ButtonTeal);
             return panel.gameObject;
         }
 
@@ -331,6 +344,8 @@ namespace AtomicSnake.EditorTools
             rect.anchoredPosition = anchoredPos;
 
             var image = go.AddComponent<Image>();
+            image.sprite = _roundedRectSprite;
+            image.type = Image.Type.Sliced;
             image.color = color;
 
             var button = go.AddComponent<Button>();
@@ -349,6 +364,8 @@ namespace AtomicSnake.EditorTools
             rect.anchoredPosition = anchoredPos;
 
             var image = go.AddComponent<Image>();
+            image.sprite = _roundedRectSprite;
+            image.type = Image.Type.Sliced;
             image.color = ButtonGreen;
 
             var button = go.AddComponent<Button>();
@@ -356,6 +373,23 @@ namespace AtomicSnake.EditorTools
 
             var labelRect = CreateText(rect, "Label", "", 22, Vector2.zero, size, TextAnchor.MiddleCenter, Color.white);
             return (button, labelRect.GetComponent<Text>());
+        }
+
+        // A rounded badge/banner background behind a text label (HUD score,
+        // timer, element-number banner), matching the reference's chip style.
+        static RectTransform CreateBadge(Transform parent, string name, Color color, Vector2 anchoredPos, Vector2 size)
+        {
+            var go = new GameObject(name, typeof(RectTransform));
+            var rect = go.GetComponent<RectTransform>();
+            rect.SetParent(parent, false);
+            rect.sizeDelta = size;
+            rect.anchoredPosition = anchoredPos;
+
+            var image = go.AddComponent<Image>();
+            image.sprite = _roundedRectSprite;
+            image.type = Image.Type.Sliced;
+            image.color = color;
+            return rect;
         }
     }
 }

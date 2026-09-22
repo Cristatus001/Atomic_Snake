@@ -97,23 +97,35 @@ namespace AtomicSnake.EditorTools
         {
             var fieldRoot = new GameObject("FieldRoot");
             var solidSprite = AssetDatabase.LoadAssetAtPath<Sprite>(AtomicSnakeArtGenerator.SolidPath);
+            var circleSprite = AssetDatabase.LoadAssetAtPath<Sprite>(AtomicSnakeArtGenerator.CirclePath);
 
-            var soilLight = new Color(0.78f, 0.62f, 0.40f);
-            var soilDark = new Color(0.71f, 0.55f, 0.35f);
-            var hedge = new Color(0.24f, 0.47f, 0.27f);
+            var dirt = new Color(0.45f, 0.32f, 0.20f);
+            var dirtBlotch = new Color(0.40f, 0.28f, 0.17f, 0.55f);
+            var leafyBorder = new Color(0.30f, 0.60f, 0.22f);
 
             float width = GridConfig.Columns * GridConfig.CellSize;
             float height = GridConfig.Rows * GridConfig.CellSize;
-            float border = GridConfig.CellSize * 0.5f;
+            float border = GridConfig.CellSize * 0.8f;
 
-            CreateQuad(fieldRoot.transform, "Hedge", solidSprite, hedge, new Vector3(0f, 0f, -0.02f), width + border * 2f, height + border * 2f, 1);
+            CreateQuad(fieldRoot.transform, "LeafyBorder", solidSprite, leafyBorder, new Vector3(0f, 0f, -0.02f), width + border * 2f, height + border * 2f, 1);
+            CreateQuad(fieldRoot.transform, "Dirt", solidSprite, dirt, new Vector3(0f, 0f, -0.01f), width, height, 0);
 
-            for (int row = 0; row < GridConfig.Rows; row++)
+            // A handful of soft, randomly-placed blotches to break up the flat dirt fill.
+            var random = new System.Random(1);
+            for (int i = 0; i < 14; i++)
             {
-                var color = row % 2 == 0 ? soilLight : soilDark;
-                var rowCenter = GridUtil.CellToWorld(new Vector2Int(0, row));
-                var pos = new Vector3(0f, rowCenter.y, -0.01f);
-                CreateQuad(fieldRoot.transform, $"Row_{row}", solidSprite, color, pos, width, GridConfig.CellSize, 0);
+                float x = (float)(random.NextDouble() - 0.5) * (width - GridConfig.CellSize);
+                float y = (float)(random.NextDouble() - 0.5) * (height - GridConfig.CellSize);
+                float size = GridConfig.CellSize * (0.8f + (float)random.NextDouble() * 0.9f);
+                var go = new GameObject($"DirtBlotch_{i}");
+                go.transform.SetParent(fieldRoot.transform, false);
+                go.transform.localPosition = new Vector3(x, y, -0.005f);
+                var sr = go.AddComponent<SpriteRenderer>();
+                sr.sprite = circleSprite;
+                sr.color = dirtBlotch;
+                sr.sortingOrder = 0;
+                float scale = size / circleSprite.bounds.size.x;
+                go.transform.localScale = new Vector3(scale, scale, 1f);
             }
 
             fieldRoot.SetActive(false);

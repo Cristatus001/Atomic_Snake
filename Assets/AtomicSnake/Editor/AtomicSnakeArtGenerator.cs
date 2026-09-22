@@ -13,6 +13,8 @@ namespace AtomicSnake.EditorTools
         public const string ArtDir = "Assets/AtomicSnake/Art";
         public const string CirclePath = ArtDir + "/circle_placeholder.png";
         public const string SolidPath = ArtDir + "/solid_placeholder.png";
+        public const string EggPath = ArtDir + "/egg_placeholder.png";
+        public const string RoundedRectPath = ArtDir + "/rounded_rect_placeholder.png";
         public const string BodyMaterialPath = ArtDir + "/SnakeBodyLine.mat";
 
         public static void GenerateAll()
@@ -21,10 +23,14 @@ namespace AtomicSnake.EditorTools
 
             WritePng(CirclePath, DrawCircle(128));
             WritePng(SolidPath, DrawSolid(8));
+            WritePng(EggPath, DrawEgg(128, 160));
+            WritePng(RoundedRectPath, DrawRoundedRect(128, 128, 28));
             AssetDatabase.Refresh();
 
             ConfigureAsSprite(CirclePath);
             ConfigureAsSprite(SolidPath);
+            ConfigureAsSprite(EggPath);
+            ConfigureAsSprite(RoundedRectPath, border: new Vector4(28, 28, 28, 28)); // 9-slice so it can stretch to any badge/button size
 
             CreateBodyMaterial();
 
@@ -50,6 +56,57 @@ namespace AtomicSnake.EditorTools
             return tex;
         }
 
+        // An egg silhouette: narrower near the top, wider near the bottom —
+        // used for the word-part collectible tiles, matching the reference design.
+        static Texture2D DrawEgg(int width, int height)
+        {
+            var tex = new Texture2D(width, height, TextureFormat.RGBA32, false);
+            float cx = width / 2f;
+            float cy = height / 2f;
+            float topRadiusX = width * 0.32f;
+            float bottomRadiusX = width * 0.47f;
+            const float edgeSoftness = 0.08f;
+
+            for (int y = 0; y < height; y++)
+            {
+                float t = y / (float)(height - 1); // 0 at bottom row, 1 at top row
+                float rx = Mathf.Lerp(bottomRadiusX, topRadiusX, t);
+                float ny = (y + 0.5f - cy) / cy;
+
+                for (int x = 0; x < width; x++)
+                {
+                    float nx = (x + 0.5f - cx) / rx;
+                    float dist = nx * nx + ny * ny;
+                    float alpha = Mathf.Clamp01((1f - dist) / edgeSoftness);
+                    tex.SetPixel(x, y, new Color(1f, 1f, 1f, alpha));
+                }
+            }
+            tex.Apply();
+            return tex;
+        }
+
+        // A rounded-rectangle mask — used for HUD badges, label chips and pill buttons.
+        static Texture2D DrawRoundedRect(int width, int height, float cornerRadius)
+        {
+            var tex = new Texture2D(width, height, TextureFormat.RGBA32, false);
+
+            for (int y = 0; y < height; y++)
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    float px = x + 0.5f;
+                    float py = y + 0.5f;
+                    float dx = Mathf.Max(0f, Mathf.Max(cornerRadius - px, px - (width - cornerRadius)));
+                    float dy = Mathf.Max(0f, Mathf.Max(cornerRadius - py, py - (height - cornerRadius)));
+                    float cornerDist = Mathf.Sqrt(dx * dx + dy * dy);
+                    float alpha = cornerDist <= cornerRadius ? 1f : Mathf.Clamp01(1f - (cornerDist - cornerRadius));
+                    tex.SetPixel(x, y, new Color(1f, 1f, 1f, alpha));
+                }
+            }
+            tex.Apply();
+            return tex;
+        }
+
         static Texture2D DrawSolid(int size)
         {
             var tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
@@ -66,7 +123,7 @@ namespace AtomicSnake.EditorTools
             Object.DestroyImmediate(tex);
         }
 
-        static void ConfigureAsSprite(string path)
+        static void ConfigureAsSprite(string path, Vector4? border = null)
         {
             AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceUpdate);
             var importer = (TextureImporter)AssetImporter.GetAtPath(path);
@@ -75,6 +132,8 @@ namespace AtomicSnake.EditorTools
             importer.filterMode = FilterMode.Bilinear;
             importer.wrapMode = TextureWrapMode.Clamp;
             importer.alphaIsTransparency = true;
+            if (border.HasValue)
+                importer.spriteBorder = border.Value;
             importer.SaveAndReimport();
         }
 
