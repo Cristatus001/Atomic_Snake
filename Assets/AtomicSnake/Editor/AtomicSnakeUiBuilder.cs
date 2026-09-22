@@ -24,7 +24,7 @@ namespace AtomicSnake.EditorTools
         static readonly Color BadgeTeal = new Color(0.22f, 0.62f, 0.64f, 0.92f);
         static readonly Color TableHeaderColor = new Color(0.20f, 0.45f, 0.55f);
         static readonly Color TableRowColor = new Color(0.10f, 0.14f, 0.22f, 0.9f);
-        static readonly Color MiniMapBackground = new Color(0.05f, 0.05f, 0.05f, 0.85f);
+        static readonly Color MiniMapBackground = new Color(0.96f, 0.95f, 0.90f, 0.95f); // reference: light rounded panel, not dark
         static readonly Color TextDark = new Color(0.20f, 0.14f, 0.08f);
 
         static Sprite _roundedRectSprite;
@@ -166,6 +166,8 @@ namespace AtomicSnake.EditorTools
             Anchor(rect, new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-160, 100));
 
             var background = go.AddComponent<Image>();
+            background.sprite = _roundedRectSprite;
+            background.type = Image.Type.Sliced;
             background.color = MiniMapBackground;
 
             var mapArea = new GameObject("MapArea", typeof(RectTransform)).GetComponent<RectTransform>();

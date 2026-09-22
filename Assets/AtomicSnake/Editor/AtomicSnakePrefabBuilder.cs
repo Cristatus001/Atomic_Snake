@@ -24,9 +24,10 @@ namespace AtomicSnake.EditorTools
         static readonly Color HeadColor = new Color(0.36f, 0.60f, 0.24f);
         static readonly Color EyeColor = new Color(0.05f, 0.05f, 0.05f);
         static readonly Color LabelChipColor = new Color(0.12f, 0.10f, 0.10f, 0.72f);
-        static readonly Color MapColor = new Color(0.20f, 0.70f, 0.75f);
+        static readonly Color MapColor = new Color(0.20f, 0.55f, 0.85f); // matches the reference's blue/white map egg
         static readonly Color ClockColor = new Color(0.90f, 0.65f, 0.20f);
         static readonly Color ObstacleColor = new Color(0.40f, 0.36f, 0.34f);
+        static readonly Color MiniMapMarkerColor = new Color(0.15f, 0.15f, 0.15f, 0.85f);
 
         // Matches the reference design's varied egg colors (yellow/pink/blue/purple);
         // WordTileView picks one deterministically from each tile's text.
@@ -50,11 +51,11 @@ namespace AtomicSnake.EditorTools
             BuildSnakeHead(circleSprite);
             BuildSnakeBody(bodyMaterial);
             BuildWordTile(eggSprite, roundedRectSprite);
-            BuildPowerUp(circleSprite, MapPickupPath, "MAP", Field.PowerUpType.Map, MapColor);
-            BuildPowerUp(circleSprite, ClockPickupPath, "CLOCK", Field.PowerUpType.Clock, ClockColor);
+            BuildPowerUp(eggSprite, roundedRectSprite, MapPickupPath, "MAP", Field.PowerUpType.Map, MapColor);
+            BuildPowerUp(eggSprite, roundedRectSprite, ClockPickupPath, "CLOCK", Field.PowerUpType.Clock, ClockColor);
             BuildObstacle(circleSprite);
-            BuildMapDot(circleSprite, TileDotPath, TilePalette[1]);
-            BuildMapDot(circleSprite, ObstacleDotPath, ObstacleColor);
+            BuildMapDot(eggSprite, TileDotPath, MiniMapMarkerColor);
+            BuildMapDot(eggSprite, ObstacleDotPath, ObstacleColor);
 
             AssetDatabase.SaveAssets();
             Debug.Log("AtomicSnakePrefabBuilder: prefabs built.");
@@ -153,17 +154,27 @@ namespace AtomicSnake.EditorTools
             SaveAndDestroy(root, WordTilePath);
         }
 
-        static void BuildPowerUp(Sprite sprite, string path, string label, Field.PowerUpType type, Color color)
+        static void BuildPowerUp(Sprite eggSprite, Sprite roundedRectSprite, string path, string label, Field.PowerUpType type, Color color)
         {
             var root = new GameObject(label + "Pickup");
 
             var holder = new GameObject("SpriteHolder");
             holder.transform.SetParent(root.transform, false);
-            holder.transform.localScale = Vector3.one * ScaleForDiameter(sprite, 0.5f);
+            holder.transform.localScale = Vector3.one * ScaleForDiameter(eggSprite, 0.5f);
             var sr = holder.AddComponent<SpriteRenderer>();
-            sr.sprite = sprite;
+            sr.sprite = eggSprite;
             sr.color = color;
-            sr.sortingOrder = 5;
+            sr.sortingOrder = 4;
+
+            var chip = new GameObject("LabelChip");
+            chip.transform.SetParent(root.transform, false);
+            chip.transform.localPosition = new Vector3(0f, 0f, -0.005f);
+            var chipRenderer = chip.AddComponent<SpriteRenderer>();
+            chipRenderer.sprite = roundedRectSprite;
+            chipRenderer.drawMode = SpriteDrawMode.Sliced;
+            chipRenderer.size = new Vector2(0.42f, 0.20f);
+            chipRenderer.color = LabelChipColor;
+            chipRenderer.sortingOrder = 5;
 
             var textHolder = new GameObject("TextHolder");
             textHolder.transform.SetParent(root.transform, false);
@@ -202,14 +213,14 @@ namespace AtomicSnake.EditorTools
             SaveAndDestroy(root, ObstaclePath);
         }
 
-        static void BuildMapDot(Sprite sprite, string path, Color color)
+        static void BuildMapDot(Sprite eggSprite, string path, Color color)
         {
             var root = new GameObject("Dot", typeof(RectTransform));
             var rect = root.GetComponent<RectTransform>();
-            rect.sizeDelta = new Vector2(10f, 10f);
+            rect.sizeDelta = new Vector2(12f, 15f);
 
             var image = root.AddComponent<Image>();
-            image.sprite = sprite;
+            image.sprite = eggSprite;
             image.color = color;
 
             SaveAndDestroy(root, path);
