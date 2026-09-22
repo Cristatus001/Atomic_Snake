@@ -59,7 +59,6 @@ namespace AtomicSnake.Gameplay
             _clockPrefab = clockPrefab;
             _obstaclePrefab = obstaclePrefab;
             _snake.OnSelfCollision += () => HandleCrash("You bit your own tail!");
-            _snake.OnHitWall += () => HandleCrash("You crashed into the hedge!");
             _snake.OnHeadMoved += HandleHeadMoved;
         }
 
