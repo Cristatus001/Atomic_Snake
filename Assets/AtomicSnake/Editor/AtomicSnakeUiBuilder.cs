@@ -24,14 +24,16 @@ namespace AtomicSnake.EditorTools
         static readonly Color BadgeTeal = new Color(0.22f, 0.62f, 0.64f, 0.92f);
         static readonly Color TableHeaderColor = new Color(0.20f, 0.45f, 0.55f);
         static readonly Color TableRowColor = new Color(0.10f, 0.14f, 0.22f, 0.9f);
-        static readonly Color MiniMapBackground = new Color(0.96f, 0.95f, 0.90f, 0.95f); // reference: light rounded panel, not dark
+        static readonly Color CloseButtonRed = new Color(0.80f, 0.15f, 0.15f);
         static readonly Color TextDark = new Color(0.20f, 0.14f, 0.08f);
 
         static Sprite _roundedRectSprite;
+        static Sprite _circleSprite;
 
         public static GameObject Build(out UIManager uiManager)
         {
             _roundedRectSprite = AssetDatabase.LoadAssetAtPath<Sprite>(AtomicSnakeArtGenerator.RoundedRectPath);
+            _circleSprite = AssetDatabase.LoadAssetAtPath<Sprite>(AtomicSnakeArtGenerator.CirclePath);
 
             var canvasGo = new GameObject("Canvas");
             var canvas = canvasGo.AddComponent<Canvas>();
@@ -51,11 +53,12 @@ namespace AtomicSnake.EditorTools
             var root = canvas.transform;
             var mainMenu = BuildMainMenu(root, out var playButton);
             var levelSelect = BuildLevelSelect(root, out var levelButtons, out var levelLabels, out var backButton, out var howToPlayButton);
-            var hud = BuildHud(root, out var levelText, out var scoreText, out var trayText, out var timerText, out var miniMap);
+            var hud = BuildHud(root, out var levelText, out var scoreText, out var trayText, out var timerText);
             var levelComplete = BuildLevelComplete(root, out var completeText, out var continueButton);
             var message = BuildMessageOverlay(root, out var messageText);
             var instructions = BuildInstructions(root, out var instructionsContinueButton);
             var loading = BuildLoading(root, out var loadingFactText);
+            var mapTable = BuildMapTablePanel(root, out var mapTableCloseButton);
 
             var uiGo = new GameObject("UIManager");
             uiManager = uiGo.AddComponent<UIManager>();
@@ -86,12 +89,13 @@ namespace AtomicSnake.EditorTools
             so.FindProperty("hudScoreText").objectReferenceValue = scoreText;
             so.FindProperty("hudTrayText").objectReferenceValue = trayText;
             so.FindProperty("hudTimerText").objectReferenceValue = timerText;
-            so.FindProperty("miniMap").objectReferenceValue = miniMap;
             so.FindProperty("levelCompleteText").objectReferenceValue = completeText;
             so.FindProperty("continueButton").objectReferenceValue = continueButton;
             so.FindProperty("messageText").objectReferenceValue = messageText;
             so.FindProperty("instructionsContinueButton").objectReferenceValue = instructionsContinueButton;
             so.FindProperty("loadingFactText").objectReferenceValue = loadingFactText;
+            so.FindProperty("mapTablePanel").objectReferenceValue = mapTable;
+            so.FindProperty("mapTableCloseButton").objectReferenceValue = mapTableCloseButton;
             so.ApplyModifiedPropertiesWithoutUndo();
 
             return canvasGo;
@@ -128,7 +132,7 @@ namespace AtomicSnake.EditorTools
             return panel.gameObject;
         }
 
-        static GameObject BuildHud(Transform parent, out Text levelText, out Text scoreText, out Text trayText, out Text timerText, out MiniMapView miniMap)
+        static GameObject BuildHud(Transform parent, out Text levelText, out Text scoreText, out Text trayText, out Text timerText)
         {
             var panel = CreatePanel(parent, "HudPanel", new Color(0, 0, 0, 0));
 
@@ -152,43 +156,7 @@ namespace AtomicSnake.EditorTools
             var timer = CreateText(timerBadge, "TimerText", "", 28, Vector2.zero, new Vector2(110, 80), TextAnchor.MiddleCenter, TextDark);
             timerText = timer.GetComponent<Text>();
 
-            miniMap = BuildMiniMap(panel);
-
             return panel.gameObject;
-        }
-
-        static MiniMapView BuildMiniMap(Transform parent)
-        {
-            var go = new GameObject("MiniMapPanel", typeof(RectTransform));
-            var rect = go.GetComponent<RectTransform>();
-            rect.SetParent(parent, false);
-            rect.sizeDelta = new Vector2(280, 160);
-            Anchor(rect, new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-160, 100));
-
-            var background = go.AddComponent<Image>();
-            background.sprite = _roundedRectSprite;
-            background.type = Image.Type.Sliced;
-            background.color = MiniMapBackground;
-
-            var mapArea = new GameObject("MapArea", typeof(RectTransform)).GetComponent<RectTransform>();
-            mapArea.SetParent(rect, false);
-            mapArea.anchorMin = Vector2.zero;
-            mapArea.anchorMax = Vector2.one;
-            mapArea.offsetMin = new Vector2(10, 10);
-            mapArea.offsetMax = new Vector2(-10, -10);
-
-            var tileDotPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(AtomicSnakePrefabBuilder.TileDotPath).GetComponent<RectTransform>();
-            var obstacleDotPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(AtomicSnakePrefabBuilder.ObstacleDotPath).GetComponent<RectTransform>();
-
-            var view = go.AddComponent<MiniMapView>();
-            var so = new SerializedObject(view);
-            so.FindProperty("mapArea").objectReferenceValue = mapArea;
-            so.FindProperty("tileDotPrefab").objectReferenceValue = tileDotPrefab;
-            so.FindProperty("obstacleDotPrefab").objectReferenceValue = obstacleDotPrefab;
-            so.ApplyModifiedPropertiesWithoutUndo();
-
-            go.SetActive(false);
-            return view;
         }
 
         static GameObject BuildLevelComplete(Transform parent, out Text completeText, out Button continueButton)
@@ -222,6 +190,37 @@ namespace AtomicSnake.EditorTools
 
             continueButton = CreateButton(panel, "ContinueButton", "Got it!", new Vector2(0, -330), new Vector2(260, 70), ButtonTeal);
             return panel.gameObject;
+        }
+
+        // Shown over the HUD when the player eats the map pickup — the same
+        // digit-root reference table as the instructions screen, but the
+        // player closes it themselves (red circular X), it doesn't auto-hide.
+        static GameObject BuildMapTablePanel(Transform parent, out Button closeButton)
+        {
+            var panel = CreatePanel(parent, "MapTablePanel", new Color(0, 0, 0, 0.55f));
+            var tableBg = CreateBadge(panel, "TableBackground", PanelBrown, new Vector2(0, -20), new Vector2(560, 420));
+            BuildDigitRootTable(tableBg, new Vector2(0, -10));
+            closeButton = CreateCloseButton(panel, new Vector2(260, 190));
+            return panel.gameObject;
+        }
+
+        static Button CreateCloseButton(Transform parent, Vector2 anchoredPos)
+        {
+            var go = new GameObject("CloseButton", typeof(RectTransform));
+            var rect = go.GetComponent<RectTransform>();
+            rect.SetParent(parent, false);
+            rect.sizeDelta = new Vector2(56, 56);
+            rect.anchoredPosition = anchoredPos;
+
+            var image = go.AddComponent<Image>();
+            image.sprite = _circleSprite;
+            image.color = CloseButtonRed;
+
+            var button = go.AddComponent<Button>();
+            button.targetGraphic = image;
+
+            CreateText(rect, "Label", "X", 30, Vector2.zero, new Vector2(56, 56), TextAnchor.MiddleCenter, Color.white);
+            return button;
         }
 
         static void BuildDigitRootTable(Transform parent, Vector2 center)

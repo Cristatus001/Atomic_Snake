@@ -43,7 +43,6 @@ namespace AtomicSnake.UI
         [SerializeField] Text hudScoreText;
         [SerializeField] Text hudTrayText;
         [SerializeField] Text hudTimerText;
-        [SerializeField] MiniMapView miniMap;
 
         [Header("Level Complete")]
         [SerializeField] Text levelCompleteText;
@@ -58,7 +57,11 @@ namespace AtomicSnake.UI
         [Header("Loading")]
         [SerializeField] Text loadingFactText;
 
-        public MiniMapView MiniMap => miniMap;
+        [Header("Map Table")]
+        [SerializeField] GameObject mapTablePanel;
+        [SerializeField] Button mapTableCloseButton;
+
+        Action _onMapTableClosed;
 
         void Awake()
         {
@@ -67,6 +70,7 @@ namespace AtomicSnake.UI
             continueButton.onClick.AddListener(() => OnLevelCompleteContinue?.Invoke());
             howToPlayButton.onClick.AddListener(() => OnHowToPlayClicked?.Invoke());
             instructionsContinueButton.onClick.AddListener(() => OnInstructionsContinue?.Invoke());
+            mapTableCloseButton.onClick.AddListener(CloseMapTable);
 
             for (int i = 0; i < levelButtons.Length; i++)
             {
@@ -86,7 +90,7 @@ namespace AtomicSnake.UI
             messageOverlay.SetActive(false);
             instructionsPanel.SetActive(false);
             loadingPanel.SetActive(false);
-            miniMap.Hide();
+            mapTablePanel.SetActive(false);
         }
 
         public void ShowMainMenu()
@@ -126,6 +130,23 @@ namespace AtomicSnake.UI
             HideAllPanels();
             loadingFactText.text = fact;
             loadingPanel.SetActive(true);
+        }
+
+        // Shown over the HUD (not a full screen swap) when the player eats the
+        // map pickup — a reference table the player closes themselves, per the
+        // reference game, rather than one that auto-hides after a timer.
+        public void ShowMapTable(Action onClosed)
+        {
+            _onMapTableClosed = onClosed;
+            mapTablePanel.SetActive(true);
+        }
+
+        void CloseMapTable()
+        {
+            mapTablePanel.SetActive(false);
+            var callback = _onMapTableClosed;
+            _onMapTableClosed = null;
+            callback?.Invoke();
         }
 
         public void ShowMessage(string message)

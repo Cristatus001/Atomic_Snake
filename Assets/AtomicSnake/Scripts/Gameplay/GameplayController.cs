@@ -172,7 +172,6 @@ namespace AtomicSnake.Gameplay
             if (_activeClock != null) Destroy(_activeClock.gameObject);
             _activeMap = null;
             _activeClock = null;
-            _ui.MiniMap.Hide();
             _mapSpawnTimer = Random.Range(MapSpawnMin, MapSpawnMax);
             _clockSpawnTimer = Random.Range(ClockSpawnMin, ClockSpawnMax);
         }
@@ -254,7 +253,8 @@ namespace AtomicSnake.Gameplay
                 Destroy(_activeMap.gameObject);
                 _activeMap = null;
                 _mapSpawnTimer = Random.Range(MapSpawnMin, MapSpawnMax);
-                StartCoroutine(RevealMiniMapRoutine());
+                ShowMapTable();
+                return;
             }
 
             if (_activeClock != null && Vector2.Distance(_activeClock.Position, headPosition) <= PickupDistance)
@@ -307,16 +307,20 @@ namespace AtomicSnake.Gameplay
             return false;
         }
 
-        IEnumerator RevealMiniMapRoutine()
+        // The map pickup shows the digit-root reference table, per the
+        // reference game — paused until the player closes it themselves,
+        // not a timed reveal.
+        void ShowMapTable()
         {
-            var tilePositions = new List<Vector2>();
-            foreach (var tile in _activeTiles) tilePositions.Add(tile.Position);
-            var obstaclePositions = new List<Vector2>();
-            foreach (var obstacle in _obstacles) obstaclePositions.Add(obstacle.Position);
+            _busy = true;
+            _snake.SetActive(false);
+            _ui.ShowMapTable(ResumeAfterMapTable);
+        }
 
-            _ui.MiniMap.Show(tilePositions, obstaclePositions);
-            yield return new WaitForSeconds(_level.MapHintDuration);
-            _ui.MiniMap.Hide();
+        void ResumeAfterMapTable()
+        {
+            _busy = false;
+            _snake.SetActive(true);
         }
 
         void HandleQuestionComplete()

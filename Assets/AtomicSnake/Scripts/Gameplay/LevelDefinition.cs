@@ -10,7 +10,6 @@ namespace AtomicSnake.Gameplay
         public bool TilesDrift;
         public float DriftIntervalSeconds;
         public int DecoyTileCount;
-        public float MapHintDuration;
         public int ObstacleCount;
 
         public int ElementCount => AtomicNumbers.Length;
@@ -19,7 +18,7 @@ namespace AtomicSnake.Gameplay
     public static class LevelCatalog
     {
         // Level 1 - Training Field / "Initial Run": stationary word parts,
-        // normal snake speed, no decoys or obstacles, longer map hint.
+        // normal snake speed, no decoys or obstacles.
         public static readonly LevelDefinition Level1 = new LevelDefinition
         {
             DisplayName = "Level 1: Training Field",
@@ -29,13 +28,11 @@ namespace AtomicSnake.Gameplay
             TilesDrift = false,
             DriftIntervalSeconds = 0f,
             DecoyTileCount = 0,
-            MapHintDuration = 5f,
             ObstacleCount = 0
         };
 
         // Level 2 - Element Anomaly / "Advanced Run": word parts disappear and
-        // reappear elsewhere, faster snake, extra incorrect word parts,
-        // obstacles, shorter map hint.
+        // reappear elsewhere, faster snake, extra incorrect word parts, obstacles.
         public static readonly LevelDefinition Level2 = new LevelDefinition
         {
             DisplayName = "Level 2: Element Anomaly",
@@ -45,7 +42,6 @@ namespace AtomicSnake.Gameplay
             TilesDrift = true,
             DriftIntervalSeconds = 4f,
             DecoyTileCount = 2,
-            MapHintDuration = 2f,
             ObstacleCount = 3
         };
 
