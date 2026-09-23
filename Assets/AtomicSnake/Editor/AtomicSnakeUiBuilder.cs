@@ -53,7 +53,7 @@ namespace AtomicSnake.EditorTools
             var root = canvas.transform;
             var mainMenu = BuildMainMenu(root, out var playButton);
             var levelSelect = BuildLevelSelect(root, out var levelButtons, out var levelLabels, out var backButton, out var howToPlayButton);
-            var hud = BuildHud(root, out var levelText, out var scoreText, out var trayText, out var timerText);
+            var hud = BuildHud(root, out var levelText, out var scoreText, out var trayText, out var timerText, out var timerBadgeImage);
             var levelComplete = BuildLevelComplete(root, out var completeText, out var continueButton);
             var message = BuildMessageOverlay(root, out var messageText);
             var instructions = BuildInstructions(root, out var instructionsContinueButton);
@@ -89,6 +89,7 @@ namespace AtomicSnake.EditorTools
             so.FindProperty("hudScoreText").objectReferenceValue = scoreText;
             so.FindProperty("hudTrayText").objectReferenceValue = trayText;
             so.FindProperty("hudTimerText").objectReferenceValue = timerText;
+            so.FindProperty("hudTimerBadge").objectReferenceValue = timerBadgeImage;
             so.FindProperty("levelCompleteText").objectReferenceValue = completeText;
             so.FindProperty("continueButton").objectReferenceValue = continueButton;
             so.FindProperty("messageText").objectReferenceValue = messageText;
@@ -132,7 +133,7 @@ namespace AtomicSnake.EditorTools
             return panel.gameObject;
         }
 
-        static GameObject BuildHud(Transform parent, out Text levelText, out Text scoreText, out Text trayText, out Text timerText)
+        static GameObject BuildHud(Transform parent, out Text levelText, out Text scoreText, out Text trayText, out Text timerText, out Image timerBadgeImage)
         {
             var panel = CreatePanel(parent, "HudPanel", new Color(0, 0, 0, 0));
 
@@ -155,6 +156,7 @@ namespace AtomicSnake.EditorTools
             Anchor(timerBadge, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-90, -60));
             var timer = CreateText(timerBadge, "TimerText", "", 28, Vector2.zero, new Vector2(110, 80), TextAnchor.MiddleCenter, TextDark);
             timerText = timer.GetComponent<Text>();
+            timerBadgeImage = timerBadge.GetComponent<Image>();
 
             return panel.gameObject;
         }

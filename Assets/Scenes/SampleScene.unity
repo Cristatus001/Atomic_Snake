@@ -12222,6 +12222,9 @@ MonoBehaviour:
   hudScoreText: {fileID: 1774234543}
   hudTrayText: {fileID: 1778832405}
   hudTimerText: {fileID: 1693578861}
+  hudTimerBadge: {fileID: 614575146}
+  timerNormalColor: {r: 0.96, g: 0.95, b: 0.9, a: 1}
+  timerFrozenColor: {r: 0.55, g: 0.8, b: 0.95, a: 1}
   levelCompleteText: {fileID: 789111281}
   continueButton: {fileID: 1208016175}
   messageText: {fileID: 1878296776}

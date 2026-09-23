@@ -43,6 +43,9 @@ namespace AtomicSnake.UI
         [SerializeField] Text hudScoreText;
         [SerializeField] Text hudTrayText;
         [SerializeField] Text hudTimerText;
+        [SerializeField] Image hudTimerBadge;
+        [SerializeField] Color timerNormalColor = new Color(0.96f, 0.95f, 0.90f);
+        [SerializeField] Color timerFrozenColor = new Color(0.55f, 0.80f, 0.95f);
 
         [Header("Level Complete")]
         [SerializeField] Text levelCompleteText;
@@ -175,6 +178,14 @@ namespace AtomicSnake.UI
         public void UpdateTimer(float timeRemaining)
         {
             hudTimerText.text = $"{Mathf.CeilToInt(timeRemaining)}s";
+        }
+
+        // Visual feedback for the clock power-up: tints the timer badge while
+        // the countdown is frozen, so the effect is obvious even though the
+        // number itself just stops changing.
+        public void SetTimerFrozen(bool frozen)
+        {
+            hudTimerBadge.color = frozen ? timerFrozenColor : timerNormalColor;
         }
 
         public void UpdateCollectedTray(List<string> sequence, int pointer)

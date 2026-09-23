@@ -70,6 +70,7 @@ namespace AtomicSnake.Gameplay
             _questionIndex = 0;
             _timeRemaining = _level.TimeLimitSeconds;
             _freezeRemaining = 0f;
+            _ui.SetTimerFrozen(false);
             _playing = true;
             _busy = false;
 
@@ -188,9 +189,18 @@ namespace AtomicSnake.Gameplay
         void UpdateTimer()
         {
             if (_freezeRemaining > 0f)
+            {
                 _freezeRemaining -= Time.deltaTime;
+                if (_freezeRemaining <= 0f)
+                {
+                    _freezeRemaining = 0f;
+                    _ui.SetTimerFrozen(false);
+                }
+            }
             else
+            {
                 _timeRemaining -= Time.deltaTime;
+            }
 
             _ui.UpdateTimer(Mathf.Max(0f, _timeRemaining));
 
@@ -263,6 +273,7 @@ namespace AtomicSnake.Gameplay
                 _activeClock = null;
                 _clockSpawnTimer = Random.Range(ClockSpawnMin, ClockSpawnMax);
                 _freezeRemaining += ClockFreezeSeconds;
+                _ui.SetTimerFrozen(true);
             }
 
             WordTileView hit = null;
@@ -360,6 +371,7 @@ namespace AtomicSnake.Gameplay
             _questionIndex = 0;
             _timeRemaining = _level.TimeLimitSeconds;
             _freezeRemaining = 0f;
+            _ui.SetTimerFrozen(false);
             _snake.ResetSnake(Vector2.zero, StartLength, StartHeadingDegrees);
             _snake.SetActive(true);
             _snake.SetSpeed(_level.SnakeSpeed);
