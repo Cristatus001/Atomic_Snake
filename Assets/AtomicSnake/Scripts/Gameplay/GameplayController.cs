@@ -40,7 +40,6 @@ namespace AtomicSnake.Gameplay
         int _score;
         float _timeRemaining;
         float _freezeRemaining;
-        float _driftTimer;
         float _mapSpawnTimer;
         float _clockSpawnTimer;
         PowerUpView _activeMap;
@@ -90,7 +89,6 @@ namespace AtomicSnake.Gameplay
             _atomicNumber = _level.AtomicNumbers[_questionIndex];
             _sequence = IupacNaming.GetCollectSequence(_atomicNumber);
             _sequencePointer = 0;
-            _driftTimer = _level.DriftIntervalSeconds;
 
             _ui.UpdateHud(_level.DisplayName, _questionIndex + 1, _level.ElementCount, _atomicNumber, _score, _timeRemaining);
             _ui.UpdateCollectedTray(_sequence, _sequencePointer);
@@ -182,7 +180,6 @@ namespace AtomicSnake.Gameplay
             if (!_playing || _busy) return;
 
             UpdateTimer();
-            UpdateDrift();
             UpdatePowerUpSpawns();
         }
 
@@ -206,23 +203,6 @@ namespace AtomicSnake.Gameplay
 
             if (_timeRemaining <= 0f)
                 StartCoroutine(HardResetRoutine("Time's up!"));
-        }
-
-        void UpdateDrift()
-        {
-            if (!_level.TilesDrift) return;
-
-            _driftTimer -= Time.deltaTime;
-            if (_driftTimer > 0f) return;
-            _driftTimer = _level.DriftIntervalSeconds;
-
-            var occupied = CurrentOccupiedPositions();
-            foreach (var tile in _activeTiles)
-            {
-                var pos = FindSpawnPosition(occupied);
-                occupied.Add(pos);
-                tile.Reposition(pos);
-            }
         }
 
         void UpdatePowerUpSpawns()

@@ -7,8 +7,6 @@ namespace AtomicSnake.Gameplay
         public float TimeLimitSeconds;
 
         public float SnakeSpeed;
-        public bool TilesDrift;
-        public float DriftIntervalSeconds;
         public int DecoyTileCount;
         public int ObstacleCount;
 
@@ -25,22 +23,18 @@ namespace AtomicSnake.Gameplay
             AtomicNumbers = new[] { 103, 108, 110, 114 },
             TimeLimitSeconds = 90f,
             SnakeSpeed = 3.4f,
-            TilesDrift = false,
-            DriftIntervalSeconds = 0f,
             DecoyTileCount = 0,
             ObstacleCount = 0
         };
 
-        // Level 2 - Element Anomaly / "Advanced Run": word parts disappear and
-        // reappear elsewhere, faster snake, extra incorrect word parts, obstacles.
+        // Level 2 - Element Anomaly / "Advanced Run": faster snake, extra
+        // incorrect word parts, obstacles.
         public static readonly LevelDefinition Level2 = new LevelDefinition
         {
             DisplayName = "Level 2: Element Anomaly",
             AtomicNumbers = new[] { 101, 102, 105, 109, 112, 117 },
             TimeLimitSeconds = 120f,
             SnakeSpeed = 4.4f,
-            TilesDrift = true,
-            DriftIntervalSeconds = 4f,
             DecoyTileCount = 2,
             ObstacleCount = 3
         };
