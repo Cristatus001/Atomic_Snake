@@ -284,7 +284,13 @@ namespace AtomicSnake.Gameplay
             {
                 _sequencePointer = 0;
                 _ui.UpdateCollectedTray(_sequence, _sequencePointer);
-                SpawnTilesForSequence();
+
+                // Only the wrongly-eaten part jumps to a new spot — every
+                // other tile already on the field stays exactly where it was.
+                var occupied = CurrentOccupiedPositions();
+                foreach (var t in _activeTiles) occupied.Add(t.Position);
+                var pos = FindSpawnPosition(occupied);
+                _activeTiles.Add(WordTileView.Create(_wordTilePrefab, _fieldRoot, hit.Text, pos));
             }
         }
 
