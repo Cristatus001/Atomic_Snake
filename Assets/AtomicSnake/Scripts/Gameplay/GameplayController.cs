@@ -282,15 +282,28 @@ namespace AtomicSnake.Gameplay
             }
             else
             {
+                int previousPointer = _sequencePointer;
                 _sequencePointer = 0;
                 _ui.UpdateCollectedTray(_sequence, _sequencePointer);
 
-                // Only the wrongly-eaten part jumps to a new spot — every
-                // other tile already on the field stays exactly where it was.
                 var occupied = CurrentOccupiedPositions();
                 foreach (var t in _activeTiles) occupied.Add(t.Position);
-                var pos = FindSpawnPosition(occupied);
-                _activeTiles.Add(WordTileView.Create(_wordTilePrefab, _fieldRoot, hit.Text, pos));
+
+                // Progress reset to the start, so every part the player had
+                // already collected correctly is needed again — but those
+                // tiles were destroyed when eaten, so they must be respawned
+                // or the sequence could never be completed again. Only those
+                // plus the part just eaten wrong get a new spot; every other
+                // tile already on the field is left exactly where it was.
+                for (int i = 0; i < previousPointer; i++)
+                {
+                    var restorePos = FindSpawnPosition(occupied);
+                    occupied.Add(restorePos);
+                    _activeTiles.Add(WordTileView.Create(_wordTilePrefab, _fieldRoot, _sequence[i], restorePos));
+                }
+
+                var wrongPos = FindSpawnPosition(occupied);
+                _activeTiles.Add(WordTileView.Create(_wordTilePrefab, _fieldRoot, hit.Text, wrongPos));
             }
         }
 
